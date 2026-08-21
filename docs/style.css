@@ -1,0 +1,223 @@
+/* ほぼ白黒。色を使うのは録音中の赤い点だけにする。 */
+:root {
+  --ink: #111111;
+  --paper: #ffffff;
+  --line: #e5e5e5;
+  --rec: #d00000;
+  --gray: #9a9a9a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  font-size: 20px;
+  line-height: 1.7;
+}
+
+main {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 32px 20px 96px;
+}
+
+h1 {
+  font-size: 28px;
+  font-weight: 700;
+  text-align: center;
+  margin: 8px 0 32px;
+}
+
+.screen {
+  display: none;
+}
+.screen[data-active] {
+  display: block;
+}
+
+/* ── マイク ───────────────────────────── */
+.mic {
+  display: block;
+  position: relative;
+  width: 240px;
+  height: 240px;
+  margin: 0 auto;
+  padding: 0;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: var(--paper);
+  cursor: pointer;
+}
+.mic:disabled {
+  cursor: default;
+}
+
+.mic-icon {
+  width: 100%;
+  height: 100%;
+  fill: var(--ink);
+  stroke: var(--ink);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+.mic-arc {
+  fill: none;
+}
+
+/* 音量で広がる輪。声が届いているかを子どもが一目で判断できるようにする。
+   輪が動かなければ、そのパソコンのマイクが壊れているとその場で分かる。 */
+.mic-ring {
+  fill: none;
+  stroke: var(--rec);
+  stroke-width: 2;
+  opacity: 0;
+  transform-origin: 50px 50px;
+}
+
+/* 許可待ち */
+.mic[data-state='asking'] .mic-icon {
+  fill: var(--gray);
+  stroke: var(--gray);
+}
+
+/* カウントダウン中と録音中はアイコンを隠して数字を見せる */
+.mic[data-state='counting'] .mic-icon,
+.mic[data-state='working'] .mic-icon {
+  opacity: 0.15;
+}
+
+/* 録音中 */
+.mic[data-state='recording'] {
+  border-color: var(--rec);
+}
+.mic[data-state='recording'] .mic-icon {
+  fill: var(--rec);
+  stroke: var(--rec);
+}
+.mic[data-state='recording'] .mic-ring {
+  opacity: 1;
+}
+
+.count {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 72px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.mic[data-state='recording'] .count {
+  font-size: 40px;
+  color: var(--rec);
+  align-content: end;
+  padding-bottom: 24px;
+}
+
+.hint {
+  text-align: center;
+  margin: 24px 0 0;
+}
+
+.error {
+  min-height: 3.4em;
+  margin: 16px 0 0;
+  text-align: center;
+  font-weight: 700;
+}
+
+/* ── 音のボタン ───────────────────────── */
+.keys {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.key {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 64px;
+  padding: 0 20px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 700;
+  font-family: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.key:active,
+.key[data-playing] {
+  background: var(--ink);
+  color: var(--paper);
+}
+.key .num {
+  font-size: 17px;
+  font-weight: 400;
+  color: var(--gray);
+}
+.key[data-playing] .num,
+.key:active .num {
+  color: var(--paper);
+}
+.key[data-done] {
+  border-color: var(--line);
+  color: var(--gray);
+}
+
+/* ── そのほかのボタン ─────────────────── */
+.actions {
+  display: grid;
+  gap: 12px;
+}
+
+.solid,
+.ghost {
+  min-height: 64px;
+  border-radius: 8px;
+  font-size: 20px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.solid {
+  border: 2px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+.ghost {
+  border: 2px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* ── 進みぐあい ───────────────────────── */
+.dots {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 40px;
+}
+.dots span {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+}
+.dots span[data-active] {
+  background: var(--ink);
+}
+
+rt {
+  font-size: 55%;
+  font-weight: 400;
+}

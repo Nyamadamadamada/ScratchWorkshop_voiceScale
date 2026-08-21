@@ -1,0 +1,9 @@
+tests/js/cases.json
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.venv/
+見本/
+node_modules/
+package-lock.json

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>こえで つくる がっき</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%8E%B5%3C/text%3E%3C/svg%3E" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main>
+      <!-- 画面1　ろくおん -->
+      <section class="screen" id="screen-record" data-active>
+        <h1>すきな こえを だしてね</h1>
+
+        <button class="mic" id="mic-button" type="button" aria-label="ろくおんする">
+          <svg class="mic-icon" viewBox="0 0 100 100" aria-hidden="true">
+            <circle class="mic-ring" cx="50" cy="50" r="30" />
+            <rect x="38" y="14" width="24" height="44" rx="12" />
+            <path class="mic-arc" d="M26 46a24 24 0 0 0 48 0" />
+            <line x1="50" y1="70" x2="50" y2="84" />
+            <line x1="36" y1="84" x2="64" y2="84" />
+          </svg>
+          <span class="count" id="count"></span>
+        </button>
+
+        <p class="hint" id="record-hint">マイクの えを おしてね</p>
+        <p class="error" id="record-error"></p>
+      </section>
+
+      <!-- 画面2　かくにん -->
+      <section class="screen" id="screen-listen">
+        <h1>きいて みよう</h1>
+        <div class="keys" id="listen-keys"></div>
+        <div class="actions">
+          <button class="ghost" type="button" data-goto="record">もういちど ろくおんする</button>
+          <button class="solid" type="button" data-goto="download">つぎへ すすむ</button>
+        </div>
+      </section>
+
+      <!-- 画面3　ダウンロード -->
+      <section class="screen" id="screen-download">
+        <h1>ほぞん しよう</h1>
+        <p class="hint">うえから じゅんばんに 1つずつ おしてね</p>
+        <div class="keys" id="download-keys"></div>
+        <div class="actions">
+          <button class="ghost" type="button" data-goto="listen">もどる</button>
+        </div>
+      </section>
+
+      <nav class="dots" id="dots" aria-hidden="true">
+        <span data-step="record"></span>
+        <span data-step="listen"></span>
+        <span data-step="download"></span>
+      </nav>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

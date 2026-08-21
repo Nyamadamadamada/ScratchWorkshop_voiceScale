@@ -1,0 +1,9 @@
+{
+  "name": "こえで つくる がっき",
+  "short_name": "こえがっき",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF"
+}
