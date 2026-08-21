@@ -94,6 +94,13 @@ for (const [title, spec, expect] of CASES) {
     if (expect.near && !caption.includes(expect.near)) problems.push(`説明が違う: ${caption}`);
     if (await page.locator('#result-keys .num').count()) problems.push('番号が残っている');
 
+    // 元の声を聞くボタン
+    await page.click('#play-original');
+    await page.waitForTimeout(150);
+    if (!(await page.locator('#play-original[data-playing]').count())) {
+      problems.push('元の声が鳴らない');
+    }
+
     // まとめてダウンロード
     const files = [];
     page.on('download', async (d) => {

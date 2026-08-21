@@ -24,6 +24,7 @@ const recorder = new Recorder();
 let playbackCtx = null;
 let notes = [];
 let objectUrls = [];
+let original = null; // 変換する前の、録音したままの声
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
@@ -55,12 +56,12 @@ function animateRing() {
   requestAnimationFrame(animateRing);
 }
 
-async function playNote(samples) {
+async function play(samples, sr = OUT_SR) {
   if (!playbackCtx) {
     playbackCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
   await playbackCtx.resume();
-  const buffer = playbackCtx.createBuffer(1, samples.length, OUT_SR);
+  const buffer = playbackCtx.createBuffer(1, samples.length, sr);
   buffer.copyToChannel(samples, 0);
   const source = playbackCtx.createBufferSource();
   source.buffer = buffer;
@@ -87,7 +88,7 @@ function renderResult(f0) {
   const near = nearestNote(f0);
   renderKeys($('result-keys'), near.name, async (note, button) => {
     button.setAttribute('data-playing', '');
-    const source = await playNote(note.samples);
+    const source = await play(note.samples);
     source.onended = () => button.removeAttribute('data-playing');
   });
   $('near-note').innerHTML = `君の声に近い音は <b>${near.name}</b>`;
@@ -175,12 +176,21 @@ async function record() {
     return;
   }
 
+  original = { samples: Float32Array.from(wave), sr };
   notes = await build(wave, pitch.f0, sr);
   renderResult(pitch.f0);
   showScreen('result');
 }
 
 micButton.addEventListener('click', record);
+
+$('play-original').addEventListener('click', async (event) => {
+  if (!original) return;
+  const button = event.currentTarget;
+  button.setAttribute('data-playing', '');
+  const source = await play(original.samples, original.sr);
+  source.onended = () => button.removeAttribute('data-playing');
+});
 $('download-all').addEventListener('click', (event) => downloadAll(event.currentTarget));
 
 for (const button of document.querySelectorAll('[data-goto]')) {

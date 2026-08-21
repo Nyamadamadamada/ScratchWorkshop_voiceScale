@@ -200,6 +200,31 @@ h1 {
   font-size: 24px;
 }
 
+/* 本筋ではない操作。目立たせず、枠の外に置いた見た目にする */
+.aside {
+  margin: -12px 0 28px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+}
+
+.mini {
+  min-height: 40px;
+  padding: 0 20px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--paper);
+  color: var(--gray);
+  font-size: 15px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.mini:active,
+.mini[data-playing] {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
 /* 常に出しておく注意書き */
 .note {
   margin: 48px 0 0;
