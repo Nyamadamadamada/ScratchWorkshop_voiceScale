@@ -29,35 +29,19 @@
         <p class="error" id="record-error"></p>
       </section>
 
-      <!-- 画面2　かくにん -->
-      <section class="screen" id="screen-listen">
-        <h1>聞いてみよう</h1>
-        <div class="keys" id="listen-keys"></div>
+      <!-- 画面2　聞いて、保存する -->
+      <section class="screen" id="screen-result">
+        <h1>聞いて、保存しよう</h1>
+        <div class="keys" id="result-keys"></div>
         <p class="near" id="near-note"></p>
-        <div class="actions">
-          <button class="ghost" type="button" data-goto="record">もう一度 録音する</button>
-          <button class="solid" type="button" data-goto="download">次へ進む</button>
-        </div>
-      </section>
-
-      <!-- 画面3　ダウンロード -->
-      <section class="screen" id="screen-download">
-        <h1>保存しよう</h1>
-        <div class="keys" id="download-keys"></div>
         <div class="actions">
           <button class="solid big" type="button" id="download-all">8つ まとめてダウンロード</button>
           <p class="hint" id="download-hint">
             「まとめてダウンロードしますか？」と出たら「許可」を押してね
           </p>
-          <button class="ghost" type="button" data-goto="listen">戻る</button>
+          <button class="ghost" type="button" data-goto="record">もう一度 録音する</button>
         </div>
       </section>
-
-      <nav class="dots" id="dots" aria-hidden="true">
-        <span data-step="record"></span>
-        <span data-step="listen"></span>
-        <span data-step="download"></span>
-      </nav>
     </main>
 
     <script type="module" src="./app.js"></script>

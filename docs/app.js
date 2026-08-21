@@ -32,9 +32,7 @@ function showScreen(step) {
     section.removeAttribute('data-active');
   }
   $(`screen-${step}`).setAttribute('data-active', '');
-  for (const dot of document.querySelectorAll('.dots span')) {
-    dot.toggleAttribute('data-active', dot.dataset.step === step);
-  }
+  window.scrollTo(0, 0);
 }
 
 function setMicState(state) {
@@ -80,24 +78,24 @@ function renderKeys(box, near, onClick) {
     button.className = 'key';
     button.textContent = note.name;
     if (note.name === near) button.setAttribute('data-near', '');
-    if (onClick) button.addEventListener('click', () => onClick(note, button));
-    else button.disabled = true;
+    button.addEventListener('click', () => onClick(note, button));
     box.append(button);
   }
 }
 
 function renderResult(f0) {
   const near = nearestNote(f0);
-  renderKeys($('listen-keys'), near.name, async (note, button) => {
+  renderKeys($('result-keys'), near.name, async (note, button) => {
     button.setAttribute('data-playing', '');
     const source = await playNote(note.samples);
     source.onended = () => button.removeAttribute('data-playing');
   });
   $('near-note').innerHTML = `君の声に近い音は <b>${near.name}</b>`;
-  renderKeys($('download-keys'), near.name, null);
 
   for (const url of objectUrls) URL.revokeObjectURL(url);
   objectUrls = notes.map((note) => URL.createObjectURL(encodeWav(note.samples, OUT_SR)));
+  $('download-hint').textContent =
+    '「まとめてダウンロードしますか？」と出たら「許可」を押してね';
 }
 
 // 8つまとめて保存する。ブラウザが「複数ファイルのダウンロード」を一度だけ確認してくる。
@@ -179,7 +177,7 @@ async function record() {
 
   notes = await build(wave, pitch.f0, sr);
   renderResult(pitch.f0);
-  showScreen('listen');
+  showScreen('result');
 }
 
 micButton.addEventListener('click', record);

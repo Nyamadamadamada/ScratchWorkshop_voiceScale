@@ -10,10 +10,10 @@ Scratch の「音をアップロード」に読ませて、自分の声を楽器
 
 ```sh
 uv sync
-uv run python -m http.server -d docs 8765
+uv run python -m http.server -d docs 8000
 ```
 
-`http://localhost:8765/` を開く。`localhost` はセキュアコンテキスト扱いなのでマイクが使える。
+`http://localhost:8000/` を開く。`localhost` はセキュアコンテキスト扱いなのでマイクが使える。
 
 ## つくり
 
@@ -31,7 +31,7 @@ docs/                 GitHub Pages で配信する一式
   scale.js            8音の生成
   wav.js              16bit PCM の WAV を組み立てる
   recorder.js         マイクから生の波形を取る
-  app.js              画面の制御
+  app.js              画面の制御。録音の画面と、聞いて保存する画面の2枚
 
 src/voice_scale/      Python 版。同じ処理を実装してある
 tests/                ふるまいと異常系。tests/README.md に読みかたがある
@@ -98,7 +98,7 @@ Scratch の「音楽」拡張機能の楽器と重ねたときだけ音がぶつ
 
 ## Scratch への渡しかた
 
-「8つ まとめてダウンロード」で8ファイルを保存し、Scratch の「音」タブ →
+画面2の「8つ まとめてダウンロード」で8ファイルを保存し、Scratch の「音」タブ →
 「音をアップロード」で読み込む。ブラウザが「複数ファイルのダウンロード」を
 一度だけ確認してくるので、許可する。
 

@@ -24,7 +24,7 @@ body {
 main {
   max-width: 640px;
   margin: 0 auto;
-  padding: 32px 20px 96px;
+  padding: 32px 20px 64px;
 }
 
 h1 {
@@ -231,24 +231,3 @@ h1 {
   color: var(--ink);
 }
 
-/* ── 進みぐあい ───────────────────────── */
-.dots {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  margin-top: 40px;
-}
-.dots span {
-  width: 10px;
-  height: 10px;
-  border: 2px solid var(--ink);
-  border-radius: 50%;
-}
-.dots span[data-active] {
-  background: var(--ink);
-}
-
-rt {
-  font-size: 55%;
-  font-weight: 400;
-}

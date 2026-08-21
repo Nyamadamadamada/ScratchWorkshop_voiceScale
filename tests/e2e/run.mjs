@@ -67,12 +67,12 @@ for (const [title, spec, expect] of CASES) {
 
   const deadline = Date.now() + 25000;
   while (Date.now() < deadline) {
-    if (await page.locator('#screen-listen[data-active]').count()) break;
+    if (await page.locator('#screen-result[data-active]').count()) break;
     if ((await page.locator('#record-error').innerText()).trim()) break;
     await page.waitForTimeout(100);
   }
 
-  const reached = Boolean(await page.locator('#screen-listen[data-active]').count());
+  const reached = Boolean(await page.locator('#screen-result[data-active]').count());
   const message = (await page.locator('#record-error').innerText()).replace(/\s+/g, ' ').trim();
   const problems = [];
 
@@ -85,16 +85,14 @@ for (const [title, spec, expect] of CASES) {
 
   if (reached) {
     // 録音した声にいちばん近い音に目印がついているか
-    const marked = await page.locator('#listen-keys .key[data-near]').allInnerTexts();
+    const marked = await page.locator('#result-keys .key[data-near]').allInnerTexts();
     if (marked.length !== 1) problems.push(`目印が ${marked.length} 個`);
     else if (expect.near && marked[0] !== expect.near) {
       problems.push(`目印が ${marked[0]}（${expect.near} のはず）`);
     }
     const caption = await page.locator('#near-note').innerText();
     if (expect.near && !caption.includes(expect.near)) problems.push(`説明が違う: ${caption}`);
-    if (await page.locator('#listen-keys .num').count()) problems.push('番号が残っている');
-
-    await page.click('[data-goto="download"]');
+    if (await page.locator('#result-keys .num').count()) problems.push('番号が残っている');
 
     // まとめてダウンロード
     const files = [];

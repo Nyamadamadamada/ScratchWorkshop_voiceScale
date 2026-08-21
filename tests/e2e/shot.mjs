@@ -39,11 +39,8 @@ for (const [tag, width, height] of [['pc', 1280, 900], ['narrow', 390, 844]]) {
   await page.waitForTimeout(1100);
   await page.screenshot({ path: `${OUT}/${tag}-2-録音中.png` });
 
-  await page.waitForSelector('#screen-listen[data-active]', { timeout: 20000 });
-  await page.screenshot({ path: `${OUT}/${tag}-3-確認.png` });
-
-  await page.click('[data-goto="download"]');
-  await page.screenshot({ path: `${OUT}/${tag}-4-保存.png` });
+  await page.waitForSelector('#screen-result[data-active]', { timeout: 20000 });
+  await page.screenshot({ path: `${OUT}/${tag}-3-確認と保存.png` });
   await ctx.close();
   console.log(`${tag} 撮影`);
 }
