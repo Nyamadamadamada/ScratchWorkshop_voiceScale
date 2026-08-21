@@ -1,62 +1,91 @@
-"""音階生成の検証。"""
+"""声から音階をつくる、というアプリの本筋のふるまい。
+
+ここを読めば、このアプリが何を保証しているかが分かるようにしてある。
+"""
 
 import numpy as np
 import pytest
-from conftest import tone
+from conftest import いちばん強い周波数, 半音差, 声
 
 from voice_scale.audio import SR
-from voice_scale.scale import C4, NOTES, base_frequency, build
+from voice_scale.pitch import detect
+from voice_scale.scale import NOTE_SEC, NOTES, base_frequency, build, nearest_note
+
+# 大人の低い声から子どもの高い声まで
+声の高さ = [85.0, 110.0, 130.81, 200.0, 300.0, 440.0, 784.0, 1000.0]
 
 
-def strongest_hz(x: np.ndarray, sr: int = SR) -> float:
-    """いちばん強い周波数成分。倍音構成に左右されない指標として使う。"""
-    n = 1 << 18
-    spectrum = np.abs(np.fft.rfft(x * np.hanning(len(x)), n=n))
-    freq = np.fft.rfftfreq(n, 1.0 / sr)
-    band = (freq > 50.0) & (freq < 20000.0)
-    return float(freq[band][np.argmax(spectrum[band])])
+def 音階をつくる(hz: float):
+    x = 声(hz)
+    return build(x, detect(x, SR).f0)
 
 
-@pytest.mark.parametrize("f0", [261.63, 300.0, 440.0, 523.25, 783.99])
-def test_8音の長さがそろう(f0):
-    notes = build(tone(f0), f0)
-    lengths = {len(w) for w in notes.values()}
-    assert len(lengths) == 1
-    assert lengths.pop() == round(SR * 0.5)
+def test_声を入れると8つの音ができる():
+    notes = 音階をつくる(300.0)
+    assert list(notes) == ["ド", "レ", "ミ", "ファ", "ソ", "ラ", "シ", "高いド"]
 
 
-@pytest.mark.parametrize("f0", [261.63, 300.0, 440.0, 783.99])
-def test_音程差が正確(f0):
-    """リサンプリングは全周波数を同じ比率で動かすので、音程差はずれない。"""
-    notes = build(tone(f0), f0)
-    base_hz = strongest_hz(notes["ド"])
-    for name, semitone in NOTES:
-        ratio = strongest_hz(notes[name]) / base_hz
-        cents = 1200.0 * np.log2(ratio / 2.0 ** (semitone / 12.0))
-        assert abs(cents) < 15.0, f"{name} が {cents:+.1f} セントずれた"
+@pytest.mark.parametrize("hz", 声の高さ)
+def test_8つの音は同じ長さになる(hz):
+    """Scratch の「音を鳴らす」は鳴り終わるまで次へ進まない。
+
+    長さがばらつくとメロディのテンポが崩れるので、そろえる工程が要る。
+    リサンプリングは低い音ほど長くなるため、放っておくとそろわない。
+    """
+    lengths = {len(w) for w in 音階をつくる(hz).values()}
+    assert lengths == {round(SR * NOTE_SEC)}
 
 
-def test_基準はC4かC5に収まる():
-    for f0 in (90.0, 130.0, 261.63, 400.0, 523.25, 784.0, 990.0):
-        base, k = base_frequency(f0)
-        assert k in (0, 1)
-        assert base in (C4, C4 * 2.0)
+@pytest.mark.parametrize("hz", 声の高さ)
+def test_ドレミの音程が正しく並ぶ(hz):
+    notes = 音階をつくる(hz)
+    ド = いちばん強い周波数(notes["ド"])
+    ずれ = {
+        name: 1200.0 * np.log2(いちばん強い周波数(notes[name]) / ド / 2.0 ** (semitone / 12.0))
+        for name, semitone in NOTES
+    }
+    悪い = {k: round(v, 1) for k, v in ずれ.items() if abs(v) > 15.0}
+    assert not 悪い, f"音程がずれた: {悪い}"
 
 
-def test_高い音源でも最高音が金切り声にならない():
-    """基準を制限しないと C6 まで上がり、最高音が2000Hzを超える。"""
-    base, _ = base_frequency(784.0)
-    assert base * 2.0 <= C4 * 4.0 + 1e-6
+@pytest.mark.parametrize("hz", 声の高さ)
+def test_声の高さがそのまま活きる(hz):
+    """録音した声と、できあがった「ド」の高さが大きく離れないこと。
+
+    以前は基準を C4 に固定していたため、大人の低い声（110Hz）が15半音も
+    持ち上げられ、まるで別人の声になっていた。上へ大きくずらさないことが要件。
+    """
+    base, _ = base_frequency(hz)
+    assert 半音差(base, hz) <= 6.0, f"{hz}Hz が {半音差(base, hz):.1f}半音 高くなる"
 
 
-def test_ドの高さが基準と一致する():
-    f0 = 300.0
-    notes = build(tone(f0), f0)
-    base, _ = base_frequency(f0)
-    assert abs(1200.0 * np.log2(strongest_hz(notes["ド"]) / base)) < 15.0
+@pytest.mark.parametrize("hz", 声の高さ)
+def test_高い声でも耳に刺さる音にならない(hz):
+    """基準の上限を外すと、高い声で最高音が2000Hzを超えて金切り声になる。"""
+    base, _ = base_frequency(hz)
+    assert base * 2.0 <= 1100.0
+
+
+@pytest.mark.parametrize(
+    ("hz", "音名"),
+    [
+        (261.63, "ド"),
+        (329.63, "ミ"),
+        (392.00, "ソ"),
+        (440.00, "ラ"),
+        (110.00, "ラ"),  # 基準より低くても、折り返して言い当てる
+        (130.81, "ド"),  # 基準のすぐ下。「高いド」に回り込ませない
+        (880.00, "ラ"),
+    ],
+)
+def test_録音した声に近い音を言い当てる(hz, 音名):
+    """画面に「君の声に近い音は◯◯」と出すために使う。"""
+    name, cents = nearest_note(hz)
+    assert (name, abs(cents) < 10.0) == (音名, True)
 
 
 def test_音量がそろう():
-    notes = build(tone(300.0), 300.0)
-    for wave in notes.values():
-        assert 0.6 < float(np.max(np.abs(wave))) < 0.8
+    """声の大きい子と小さい子で、できあがる音の音量が変わらないようにする。"""
+    小さい声 = 音階をつくる(300.0)
+    for wave in 小さい声.values():
+        assert float(np.max(np.abs(wave))) == pytest.approx(0.708, abs=0.01)

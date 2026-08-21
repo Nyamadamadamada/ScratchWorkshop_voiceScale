@@ -19,10 +19,20 @@ export const NOTES = [
   ['高いド', 12],
 ];
 
-// 基準になるドの周波数。C4 か C5 に必ず収める。
-// 制限しないと、高い音源では基準が C6 まで上がり最高音が金切り声になる。
+// 基準にできるオクターブの範囲。C2(65Hz) から C5(523Hz) まで
+export const MIN_OCTAVE = -2;
+export const MAX_OCTAVE = 1;
+
+// 基準になるドの周波数。いちばん近いオクターブを選ぶ。
+// 声の高さをそのまま活かすため、変換の比は 0.52〜1.41倍に収まる。
+//
+// 上限だけ C5 で止める。止めないと高い音源で基準が C6 まで上がり、
+// 最高音が2000Hzを超えて金切り声になる。
+//
+// 下限を切ってはいけない。以前 0 で切っていたため、大人の低い声（110Hz）が
+// 15半音も持ち上げられ、まるで別人の声になっていた。
 export function baseFrequency(f0) {
-  const k = Math.min(1, Math.max(0, Math.round(Math.log2(f0 / C4))));
+  const k = Math.min(MAX_OCTAVE, Math.max(MIN_OCTAVE, Math.round(Math.log2(f0 / C4))));
   return { base: C4 * 2 ** k, k };
 }
 
@@ -58,4 +68,29 @@ export async function build(x, f0, srcSr, noteSec = NOTE_SEC) {
     notes.push({ name, samples: normalize(fitLength(shifted, length, OUT_SR)) });
   }
   return notes;
+}
+
+// 録音した声にいちばん近い音の名前と、そのずれ[セント]を返す。
+// 声が基準の外にあっても、オクターブを折り返してから比べる。110Hz なら「ラ」になる。
+//
+// 折り返す窓は4分音ぶん下げてある。基準のすぐ下にある声が「高いド」に
+// 回り込むのを防ぐため。ドと高いドは同じ音なので、低いほうの「ド」で答える。
+export function nearestNote(f0) {
+  const { base } = baseFrequency(f0);
+  const low = base * 2 ** (-1 / 24);
+  let folded = f0;
+  while (folded < low) folded *= 2;
+  while (folded >= low * 2) folded /= 2;
+
+  let best = NOTES[0];
+  let bestGap = Infinity;
+  for (const note of NOTES) {
+    if (note[1] >= 12) continue;
+    const gap = Math.abs(1200 * Math.log2(folded / (base * 2 ** (note[1] / 12))));
+    if (gap < bestGap) {
+      bestGap = gap;
+      best = note;
+    }
+  }
+  return { name: best[0], cents: 1200 * Math.log2(folded / (base * 2 ** (best[1] / 12))) };
 }

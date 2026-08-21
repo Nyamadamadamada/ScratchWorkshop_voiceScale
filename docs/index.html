@@ -12,9 +12,9 @@
     <main>
       <!-- 画面1　ろくおん -->
       <section class="screen" id="screen-record" data-active>
-        <h1>すきな こえを だしてね</h1>
+        <h1>声から音階を作ろう！</h1>
 
-        <button class="mic" id="mic-button" type="button" aria-label="ろくおんする">
+        <button class="mic" id="mic-button" type="button" aria-label="録音する">
           <svg class="mic-icon" viewBox="0 0 100 100" aria-hidden="true">
             <circle class="mic-ring" cx="50" cy="50" r="30" />
             <rect x="38" y="14" width="24" height="44" rx="12" />
@@ -25,27 +25,31 @@
           <span class="count" id="count"></span>
         </button>
 
-        <p class="hint" id="record-hint">マイクの えを おしてね</p>
+        <p class="hint" id="record-hint">マイクを押してね</p>
         <p class="error" id="record-error"></p>
       </section>
 
       <!-- 画面2　かくにん -->
       <section class="screen" id="screen-listen">
-        <h1>きいて みよう</h1>
+        <h1>聞いてみよう</h1>
         <div class="keys" id="listen-keys"></div>
+        <p class="near" id="near-note"></p>
         <div class="actions">
-          <button class="ghost" type="button" data-goto="record">もういちど ろくおんする</button>
-          <button class="solid" type="button" data-goto="download">つぎへ すすむ</button>
+          <button class="ghost" type="button" data-goto="record">もう一度 録音する</button>
+          <button class="solid" type="button" data-goto="download">次へ進む</button>
         </div>
       </section>
 
       <!-- 画面3　ダウンロード -->
       <section class="screen" id="screen-download">
-        <h1>ほぞん しよう</h1>
-        <p class="hint">うえから じゅんばんに 1つずつ おしてね</p>
+        <h1>保存しよう</h1>
         <div class="keys" id="download-keys"></div>
         <div class="actions">
-          <button class="ghost" type="button" data-goto="listen">もどる</button>
+          <button class="solid big" type="button" id="download-all">8つ まとめてダウンロード</button>
+          <p class="hint" id="download-hint">
+            「まとめてダウンロードしますか？」と出たら「許可」を押してね
+          </p>
+          <button class="ghost" type="button" data-goto="listen">戻る</button>
         </div>
       </section>
 

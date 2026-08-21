@@ -14,11 +14,12 @@ const OUT = process.env.OUT_DIR ?? null;
 
 // [名前, 波形を作る関数のソース, 期待する結果]
 const CASES = [
-  ['子どもの声 300Hz', { kind: 'tone', hz: 300, gain: 0.5 }, { pass: true, base: 261.6 }],
-  ['高い声 784Hz', { kind: 'tone', hz: 784, gain: 0.5 }, { pass: true, base: 523.3 }],
-  ['低い声 130Hz', { kind: 'tone', hz: 130.81, gain: 0.5 }, { pass: true, base: 261.6 }],
+  ['子どもの声 300Hz', { kind: 'tone', hz: 300, gain: 0.5 }, { pass: true, near: 'レ' }],
+  ['高い声 784Hz', { kind: 'tone', hz: 784, gain: 0.5 }, { pass: true, near: 'ソ' }],
+  ['大人の低い声 110Hz', { kind: 'tone', hz: 110, gain: 0.5 }, { pass: true, near: 'ラ' }],
+  ['低い声 130Hz', { kind: 'tone', hz: 130.81, gain: 0.5 }, { pass: true, near: 'ド' }],
   ['ホワイトノイズ', { kind: 'noise', gain: 0.5 }, { pass: false, message: 'のばしてね' }],
-  ['小さすぎる声', { kind: 'tone', hz: 300, gain: 0.003 }, { pass: false, message: 'ちかくで' }],
+  ['小さすぎる声', { kind: 'tone', hz: 300, gain: 0.003 }, { pass: false, message: '近くで' }],
 ];
 
 function makeSource(spec) {
@@ -83,29 +84,38 @@ for (const [title, spec, expect] of CASES) {
   }
 
   if (reached) {
-    await page.click('[data-goto="download"]');
-    const links = page.locator('#download-keys a.key');
-    const count = await links.count();
-    if (count !== 8) problems.push(`ファイルが ${count} 個`);
-
-    const names = [];
-    for (let i = 0; i < count; i += 1) names.push(await links.nth(i).getAttribute('download'));
-    const want = ['ド', 'レ', 'ミ', 'ファ', 'ソ', 'ラ', 'シ', '高いド'].map((n) => `${n}.wav`);
-    if (names.join() !== want.join()) problems.push(`名前が違う: ${names.join(' ')}`);
-
-    if (OUT) {
-      const dir = `${OUT}/${title.replace(/\s+/g, '_')}`;
-      mkdirSync(dir, { recursive: true });
-      for (let i = 0; i < count; i += 1) {
-        const b64 = await page.evaluate(async (u) => {
-          const v = new Uint8Array(await (await fetch(u)).arrayBuffer());
-          let s = '';
-          for (let k = 0; k < v.length; k += 1) s += String.fromCharCode(v[k]);
-          return btoa(s);
-        }, await links.nth(i).getAttribute('href'));
-        writeFileSync(`${dir}/${names[i]}`, Buffer.from(b64, 'base64'));
-      }
+    // 録音した声にいちばん近い音に目印がついているか
+    const marked = await page.locator('#listen-keys .key[data-near]').allInnerTexts();
+    if (marked.length !== 1) problems.push(`目印が ${marked.length} 個`);
+    else if (expect.near && marked[0] !== expect.near) {
+      problems.push(`目印が ${marked[0]}（${expect.near} のはず）`);
     }
+    const caption = await page.locator('#near-note').innerText();
+    if (expect.near && !caption.includes(expect.near)) problems.push(`説明が違う: ${caption}`);
+    if (await page.locator('#listen-keys .num').count()) problems.push('番号が残っている');
+
+    await page.click('[data-goto="download"]');
+
+    // まとめてダウンロード
+    const files = [];
+    page.on('download', async (d) => {
+      const name = d.suggestedFilename();
+      files.push(name);
+      if (OUT) {
+        const dir = `${OUT}/${title.replace(/\s+/g, '_')}`;
+        mkdirSync(dir, { recursive: true });
+        await d.saveAs(`${dir}/${name}`);
+      } else {
+        await d.delete();
+      }
+    });
+    await page.click('#download-all');
+    const until = Date.now() + 15000;
+    while (files.length < 8 && Date.now() < until) await page.waitForTimeout(150);
+
+    const want = ['ド', 'レ', 'ミ', 'ファ', 'ソ', 'ラ', 'シ', '高いド'].map((n) => `${n}.wav`);
+    if (files.length !== 8) problems.push(`ダウンロードが ${files.length} 個`);
+    else if (files.join() !== want.join()) problems.push(`名前か順番が違う: ${files.join(' ')}`);
   }
 
   if (errors.length) problems.push(`コンソールエラー: ${errors.join(' / ')}`);

@@ -9,10 +9,10 @@ export const MAX_SPREAD_CENTS = 150;
 // 教室で何度も弾かれると子どもが萎縮する。原理的に無理なものだけ確実に止め、
 // 多少音程が動く程度は通す。150セントはそのために緩めに取ってある。
 export const MESSAGES = {
-  quiet: 'もっと ちかくで こえを だしてね',
-  short: 'もうすこし ながく こえを だしてね',
-  unpitched: '「あー」や「にゃー」のように こえを のばしてね',
-  unstable: 'おなじ たかさで こえを だしてね',
+  quiet: 'もっと近くで声を出してね',
+  short: 'もう少し長く声を出してね',
+  unpitched: '「あー」や「にゃー」のように声をのばしてね',
+  unstable: '同じ高さで声を出してね',
 };
 
 export function peakOf(x) {

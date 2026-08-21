@@ -13,6 +13,7 @@
 
 body {
   margin: 0;
+  overflow-x: hidden; /* 輪が広がっても横スクロールを出さない */
   background: var(--paper);
   color: var(--ink);
   font-family: system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
@@ -21,7 +22,7 @@ body {
 }
 
 main {
-  max-width: 560px;
+  max-width: 640px;
   margin: 0 auto;
   padding: 32px 20px 96px;
 }
@@ -56,6 +57,12 @@ h1 {
 .mic:disabled {
   cursor: default;
 }
+/* 音量の輪がボタンの外まで広がれるようにする。
+   切らないと viewBox の外が捨てられ、アイコンより大きい円が描けない。 */
+.mic,
+.mic-icon {
+  overflow: visible;
+}
 
 .mic-icon {
   width: 100%;
@@ -69,7 +76,7 @@ h1 {
   fill: none;
 }
 
-/* 音量で広がる輪。声が届いているかを子どもが一目で判断できるようにする。
+/* 音量で広がる輪。声が届いているかを一目で判断できるようにする。
    輪が動かなければ、そのパソコンのマイクが壊れているとその場で分かる。 */
 .mic-ring {
   fill: none;
@@ -77,6 +84,7 @@ h1 {
   stroke-width: 2;
   opacity: 0;
   transform-origin: 50px 50px;
+  transition: transform 60ms linear;
 }
 
 /* 許可待ち */
@@ -112,16 +120,14 @@ h1 {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.mic[data-state='recording'] .count {
-  font-size: 40px;
-  color: var(--rec);
-  align-content: end;
-  padding-bottom: 24px;
-}
-
 .hint {
   text-align: center;
   margin: 24px 0 0;
+}
+.actions .hint {
+  margin: 0;
+  font-size: 17px;
+  color: var(--gray);
 }
 
 .error {
@@ -134,25 +140,30 @@ h1 {
 /* ── 音のボタン ───────────────────────── */
 .keys {
   display: grid;
-  gap: 12px;
-  margin-bottom: 32px;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+  margin-bottom: 28px;
+}
+/* せまい画面では2段に折り返す。1辺が64pxを下回らないようにする */
+@media (max-width: 660px) {
+  .keys {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
 .key {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 64px;
-  padding: 0 20px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  padding: 0;
   border: 2px solid var(--ink);
   border-radius: 8px;
   background: var(--paper);
   color: var(--ink);
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
   font-family: inherit;
-  text-align: left;
   text-decoration: none;
   cursor: pointer;
 }
@@ -161,24 +172,44 @@ h1 {
   background: var(--ink);
   color: var(--paper);
 }
-.key .num {
-  font-size: 17px;
-  font-weight: 400;
-  color: var(--gray);
+
+/* 録音した声にいちばん近い音の目印 */
+.key[data-near] {
+  border-width: 4px;
 }
-.key[data-playing] .num,
-.key:active .num {
-  color: var(--paper);
+.key[data-near]::after {
+  content: '';
+  position: absolute;
+  bottom: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink);
 }
-.key[data-done] {
-  border-color: var(--line);
-  color: var(--gray);
+.key[data-near]:active::after,
+.key[data-near][data-playing]::after {
+  background: var(--paper);
+}
+
+.near {
+  min-height: 1.7em;
+  margin: 0 0 28px;
+  text-align: center;
+}
+.near b {
+  font-size: 24px;
 }
 
 /* ── そのほかのボタン ─────────────────── */
 .actions {
   display: grid;
   gap: 12px;
+}
+
+.big {
+  min-height: 88px;
+  font-size: 24px;
+  font-weight: 700;
 }
 
 .solid,

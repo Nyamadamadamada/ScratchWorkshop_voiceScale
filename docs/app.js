@@ -4,9 +4,10 @@ import { OUT_SR, trim } from './audio.js';
 import { MESSAGES, judge } from './check.js';
 import { detect } from './pitch.js';
 import { Recorder } from './recorder.js';
-import { build } from './scale.js';
+import { build, nearestNote } from './scale.js';
 import { encodeWav } from './wav.js';
 
+const RECORDING_TEXT = '声を出して！';
 const COUNTDOWN_SEC = 3;
 const RECORD_SEC = 2; // 2秒録るが、使うのは最大1.0秒。
 // カウントダウン終了から声が出るまで0.3〜0.5秒のラグがあり、
@@ -26,9 +27,6 @@ let objectUrls = [];
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
-// ふりがなをつけた表示名にする
-const label = (name) => (name === '高いド' ? '<ruby>高<rt>たか</rt></ruby>いド' : name);
-
 function showScreen(step) {
   for (const section of document.querySelectorAll('.screen')) {
     section.removeAttribute('data-active');
@@ -45,10 +43,16 @@ function setMicState(state) {
   micButton.disabled = Boolean(state);
 }
 
-// 音量に応じて輪を広げる。声が届いていることを子どもに見せるための表示。
+// 音量に応じて輪を広げる。声が届いていることを見せるための表示。
+//
+// 平方根を通してから広げる。そのまま使うと少し大きい声ですぐ上限に張りつき、
+// 声の大小が伝わらない。上限の2倍でボタンの外側まで届く。
+const RING_MAX_SCALE = 2;
+
 function animateRing() {
   if (micButton.dataset.state !== 'recording') return;
-  const scale = 1 + Math.min(1.4, recorder.level * 14);
+  const loudness = Math.min(1, Math.sqrt(recorder.level) * 2.2);
+  const scale = 1 + (RING_MAX_SCALE - 1) * loudness;
   ring.setAttribute('transform', `scale(${scale.toFixed(3)})`);
   requestAnimationFrame(animateRing);
 }
@@ -67,41 +71,52 @@ async function playNote(samples) {
   return source;
 }
 
-function renderListenKeys() {
-  const box = $('listen-keys');
+// 8つの音のボタンを並べる。録音した声にいちばん近い音には目印をつける。
+function renderKeys(box, near, onClick) {
   box.textContent = '';
-  notes.forEach((note, index) => {
+  for (const note of notes) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'key';
-    button.innerHTML = `<span>${label(note.name)}</span><span class="num">${index + 1}</span>`;
-    button.addEventListener('click', async () => {
-      button.setAttribute('data-playing', '');
-      const source = await playNote(note.samples);
-      source.onended = () => button.removeAttribute('data-playing');
-    });
+    button.textContent = note.name;
+    if (note.name === near) button.setAttribute('data-near', '');
+    if (onClick) button.addEventListener('click', () => onClick(note, button));
+    else button.disabled = true;
     box.append(button);
-  });
+  }
 }
 
-function renderDownloadKeys() {
-  const box = $('download-keys');
-  box.textContent = '';
-  for (const url of objectUrls) URL.revokeObjectURL(url);
-  objectUrls = [];
-
-  notes.forEach((note, index) => {
-    const url = URL.createObjectURL(encodeWav(note.samples, OUT_SR));
-    objectUrls.push(url);
-
-    const link = document.createElement('a');
-    link.className = 'key';
-    link.href = url;
-    link.download = `${note.name}.wav`;
-    link.innerHTML = `<span>${label(note.name)}</span><span class="num">${index + 1}</span>`;
-    link.addEventListener('click', () => link.setAttribute('data-done', ''));
-    box.append(link);
+function renderResult(f0) {
+  const near = nearestNote(f0);
+  renderKeys($('listen-keys'), near.name, async (note, button) => {
+    button.setAttribute('data-playing', '');
+    const source = await playNote(note.samples);
+    source.onended = () => button.removeAttribute('data-playing');
   });
+  $('near-note').innerHTML = `君の声に近い音は <b>${near.name}</b>`;
+  renderKeys($('download-keys'), near.name, null);
+
+  for (const url of objectUrls) URL.revokeObjectURL(url);
+  objectUrls = notes.map((note) => URL.createObjectURL(encodeWav(note.samples, OUT_SR)));
+}
+
+// 8つまとめて保存する。ブラウザが「複数ファイルのダウンロード」を一度だけ確認してくる。
+async function downloadAll(button) {
+  button.disabled = true;
+  const original = button.textContent;
+  for (let i = 0; i < notes.length; i += 1) {
+    const link = document.createElement('a');
+    link.href = objectUrls[i];
+    link.download = `${notes[i].name}.wav`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    button.textContent = `保存中… ${i + 1} / ${notes.length}`;
+    await sleep(250);
+  }
+  button.textContent = original;
+  button.disabled = false;
+  $('download-hint').textContent = 'ダウンロードフォルダに8つ入っているか見てみよう';
 }
 
 async function record() {
@@ -109,22 +124,22 @@ async function record() {
 
   // マイクの許可
   setMicState('asking');
-  recordHint.textContent = 'マイクを つかっても いい？ を おしてね';
+  recordHint.textContent = 'マイクの使用を許可してね';
   try {
     await recorder.open();
   } catch (err) {
     setMicState(null);
-    recordHint.textContent = 'マイクの えを おしてね';
+    recordHint.textContent = 'マイクを押してね';
     recordError.textContent =
       err && err.name === 'NotAllowedError'
-        ? 'マイクを つかう きょかを おしてね'
-        : 'マイクが みつかりません。せんせいを よんでね';
+        ? 'マイクを使う許可を押してね'
+        : 'マイクが見つかりません。先生を呼んでね';
     return;
   }
 
   // カウントダウン
   setMicState('counting');
-  recordHint.textContent = 'じゅんび して…';
+  recordHint.textContent = '準備して…';
   for (let n = COUNTDOWN_SEC; n > 0; n -= 1) {
     countLabel.textContent = String(n);
     await sleep(1000);
@@ -132,11 +147,13 @@ async function record() {
 
   // 録音
   setMicState('recording');
-  recordHint.textContent = 'こえを だして！';
+  recordHint.textContent = RECORDING_TEXT;
   recorder.start();
   animateRing();
+  // 残り秒数はマイクの絵に重ねず、下の行に出す。重ねると読めない。
+  countLabel.textContent = '';
   for (let left = RECORD_SEC; left > 0; left -= 1) {
-    countLabel.textContent = `あと ${left}`;
+    recordHint.textContent = `${RECORDING_TEXT}　あと ${left}秒`;
     await sleep(1000);
   }
   const raw = recorder.stop();
@@ -145,7 +162,7 @@ async function record() {
   // 判定
   setMicState('working');
   countLabel.textContent = '';
-  recordHint.textContent = 'つくって います…';
+  recordHint.textContent = '作っています…';
   await sleep(0); // 画面を描き直させてから重い処理に入る
 
   const wave = trim(raw);
@@ -153,7 +170,7 @@ async function record() {
   const reasons = judge(wave, sr, pitch);
 
   setMicState(null);
-  recordHint.textContent = 'マイクの えを おしてね';
+  recordHint.textContent = 'マイクを押してね';
 
   if (reasons.length > 0) {
     recordError.innerHTML = reasons.map((r) => MESSAGES[r]).join('<br />');
@@ -161,12 +178,12 @@ async function record() {
   }
 
   notes = await build(wave, pitch.f0, sr);
-  renderListenKeys();
-  renderDownloadKeys();
+  renderResult(pitch.f0);
   showScreen('listen');
 }
 
 micButton.addEventListener('click', record);
+$('download-all').addEventListener('click', (event) => downloadAll(event.currentTarget));
 
 for (const button of document.querySelectorAll('[data-goto]')) {
   button.addEventListener('click', () => showScreen(button.dataset.goto));

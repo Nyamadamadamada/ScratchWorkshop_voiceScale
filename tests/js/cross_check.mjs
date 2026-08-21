@@ -1,25 +1,24 @@
-// pitch.js / check.js / audio.js が Python 版と同じ値を出すか確かめる。
-// 同じ入力を tests/js/cases.json から読み、結果を JSON で返す。
+// docs/ の JavaScript に、Python 版と同じ入力を通して結果を返す。
+// tests/test_parity.py から呼ばれる。
 import { readFileSync } from 'node:fs';
-import { detect } from '../../docs/pitch.js';
+import { trim } from '../../docs/audio.js';
 import { judge } from '../../docs/check.js';
-import { trim, fitLength, normalize } from '../../docs/audio.js';
+import { detect } from '../../docs/pitch.js';
+import { baseFrequency, nearestNote } from '../../docs/scale.js';
 
 const cases = JSON.parse(readFileSync(new URL('./cases.json', import.meta.url), 'utf8'));
 const out = {};
 for (const [name, c] of Object.entries(cases)) {
-  const x = Float32Array.from(c.samples);
-  const t = trim(x);
-  const p = detect(t, c.sr);
+  const x = trim(Float32Array.from(c.samples));
+  const p = detect(x, c.sr);
   out[name] = {
-    trimmed: t.length,
-    f0: p.f0,
-    voicedRatio: p.voicedRatio,
-    spreadCents: p.spreadCents,
+    trimmed: x.length,
     frames: p.frames,
-    reasons: judge(t, c.sr, p),
-    fitted: fitLength(t, 22050, 44100).length,
-    peak: Math.max(...normalize(t.subarray(0, 4096))).toFixed(4),
+    voicedRatio: p.voicedRatio,
+    f0: Number.isFinite(p.f0) ? p.f0 : null,
+    reasons: judge(x, c.sr, p),
+    base: Number.isFinite(p.f0) ? baseFrequency(p.f0).base : null,
+    near: Number.isFinite(p.f0) ? nearestNote(p.f0).name : null,
   };
 }
 process.stdout.write(JSON.stringify(out));
