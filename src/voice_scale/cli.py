@@ -1,6 +1,8 @@
-"""コマンドライン。見本音源をつくるときに使う。
+"""できあがった音階を測って表示する。
 
-ブラウザ側の入り口は docs/app.js。
+    voice-scale check 見本/にゃー
+
+音をつくるのは `node tools/generate.mjs`。こちらはその結果を確かめる係。
 """
 
 from __future__ import annotations
@@ -8,106 +10,73 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import NamedTuple
 
-import numpy as np
+from voice_scale.measure import Measured, interval_errors, measure_scale
 
-from voice_scale import wav
-from voice_scale.audio import OUT_SR, trim
-from voice_scale.check import MESSAGES, judge
-from voice_scale.pitch import Pitch, detect
-from voice_scale.scale import NOTE_SEC, base_frequency, build, nearest_note
-
-NOTE_NAMES = ("ド", "ド#", "レ", "レ#", "ミ", "ファ", "ファ#", "ソ", "ソ#", "ラ", "ラ#", "シ")
+MAX_INTERVAL_CENTS = 15.0  # これを超えると音階として狂って聞こえる
+MAX_TAIL = 0.01  # 鳴り終わりの振幅。大きいとプチッと鳴る
 
 
-def note_name(hz: float) -> str:
-    """周波数を音名にする。A4=440Hz 基準。"""
-    if not np.isfinite(hz) or hz <= 0:
-        return "?"
-    semitone = round(12.0 * np.log2(hz / 440.0)) + 57  # A4 を 57 とする
-    return f"{NOTE_NAMES[semitone % 12]}{semitone // 12}"
+def 判定(measured: list[Measured], errors: dict[str, float]) -> list[str]:
+    """おかしいところを並べて返す。空なら問題なし。"""
+    problems = []
+
+    狂い = {name: round(c, 1) for name, c in errors.items() if abs(c) > MAX_INTERVAL_CENTS}
+    if 狂い:
+        problems.append(f"音程が狂っている: {狂い}")
+
+    lengths = {m.sec for m in measured}
+    if len(lengths) > 1:
+        problems.append(f"長さがそろっていない: {sorted(lengths)}")
+
+    切れ = [m.file for m in measured if m.tail > MAX_TAIL]
+    if 切れ:
+        problems.append(f"鳴り終わりがプチッと切れる: {' '.join(切れ)}")
+
+    形式 = {(m.channels, m.sample_rate, m.bit_depth) for m in measured}
+    if 形式 != {(1, 44100, 16)}:
+        problems.append(f"Scratch が読める形式でない: {形式}")
+
+    return problems
 
 
-class Analysis(NamedTuple):
-    """読み込みから判定までの結果をまとめたもの。"""
+def cmd_check(args: argparse.Namespace) -> int:
+    measured = measure_scale(args.directory)
+    errors = interval_errors(measured)
 
-    wave: np.ndarray
-    pitch: Pitch
-    reasons: list[str]
+    print(f"{args.directory}")
+    列 = ["音", "ファイル", "Hz", "音程の狂い", "鳴っている長さ", "鳴り終わり"]
+    print(f"  {列[0]:6s}{列[1]:10s}{列[2]:>9}{列[3]:>12}{列[4]:>14}{列[5]:>11}")
+    for m in measured:
+        print(
+            f"  {m.name:6s}{m.file:10s}{m.hz:9.1f}{errors[m.name]:+10.1f}ct"
+            f"{m.sounding_sec:12.3f}秒{m.tail:11.4f}"
+        )
 
-
-def analyze(path: Path) -> Analysis:
-    """読み込み、無音を削り、音程を測り、音階にできるか判定する。"""
-    wave = trim(wav.load(path))
-    pitch = detect(wave, OUT_SR)
-    return Analysis(wave, pitch, judge(wave, OUT_SR, pitch))
-
-
-def cmd_info(args: argparse.Namespace) -> int:
-    wave, pitch, reasons = analyze(args.input)
-    peak = float(np.max(np.abs(wave))) if len(wave) else 0.0
-    print(f"{args.input.name}")
-    print(f"  長さ      {len(wave) / OUT_SR:.2f} 秒")
-    print(f"  ピーク    {peak:.3f}")
-    print(f"  有声率    {pitch.voiced_ratio:.0%}  ({pitch.frames} 窓)")
-    print(f"  ばらつき  {pitch.spread_cents:.0f} セント")
-    if reasons:
-        print("  判定      音階にできない")
-        for reason in reasons:
-            print(f"            - {MESSAGES[reason]}")
+    problems = 判定(measured, errors)
+    print()
+    if problems:
+        for p in problems:
+            print(f"  ✗ {p}", file=sys.stderr)
         return 1
-    base = base_frequency(pitch.f0)
-    near = nearest_note(pitch.f0)
-    print(f"  高さ      {pitch.f0:.1f} Hz  ({note_name(pitch.f0)})")
-    print(f"  近い音    {near.name}  ({near.cents:+.0f} セント)")
-    print(f"  基準のド  {base.hz:.1f} Hz  (C{4 + base.octave})")
-    print("  判定      音階にできる")
-    return 0
-
-
-def cmd_build(args: argparse.Namespace) -> int:
-    wave, pitch, reasons = analyze(args.input)
-    if reasons:
-        print(f"{args.input.name} は音階にできません", file=sys.stderr)
-        for reason in reasons:
-            print(f"  {MESSAGES[reason]}", file=sys.stderr)
-        return 1
-
-    out_dir: Path = args.out
-    out_dir.mkdir(parents=True, exist_ok=True)
-    base = base_frequency(pitch.f0)
-    print(f"{args.input.name}  {pitch.f0:.1f}Hz ({note_name(pitch.f0)})  基準 C{4 + base.octave}")
-
-    for sound in build(wave, pitch.f0, OUT_SR, args.note_sec):
-        wav.write(out_dir / f"{sound.name}.wav", sound.samples)
-        print(f"  {sound.name:5s} {len(sound.samples) / OUT_SR:.3f}秒  {sound.name}.wav")
-    print(f"→ {out_dir}")
+    print(
+        f"  ○ 8音とも {measured[0].sec:.3f}秒、モノラル16bit 44100Hz、音程の狂いは"
+        f" {max(abs(c) for c in errors.values()):.1f}セント以内"
+    )
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="voice-scale", description="声から音階をつくる")
+    parser = argparse.ArgumentParser(prog="voice-scale", description="できあがった音階を測る")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_info = sub.add_parser("info", help="音の高さと判定を表示する")
-    p_info.add_argument("input", type=Path)
-    p_info.set_defaults(func=cmd_info)
-
-    p_build = sub.add_parser("build", help="8音の WAV を書き出す")
-    p_build.add_argument("input", type=Path)
-    p_build.add_argument("-o", "--out", type=Path, default=Path("見本"))
-    p_build.add_argument(
-        "--note-sec",
-        type=float,
-        default=NOTE_SEC,
-        help=f"1音の長さ[秒]。既定 {NOTE_SEC}（テンポ120の四分音符）",
-    )
-    p_build.set_defaults(func=cmd_build)
+    p_check = sub.add_parser("check", help="8音の WAV を測って確かめる")
+    p_check.add_argument("directory", type=Path)
+    p_check.set_defaults(func=cmd_check)
 
     args = parser.parse_args(argv)
-    if not args.input.exists():
-        print(f"見つかりません: {args.input}", file=sys.stderr)
+    if not args.directory.is_dir():
+        print(f"見つかりません: {args.directory}", file=sys.stderr)
         return 2
     return args.func(args)
 

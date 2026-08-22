@@ -33,7 +33,9 @@ export class Recorder {
     this.stream = await navigator.mediaDevices.getUserMedia(CONSTRAINTS);
     this.ctx = new (window.AudioContext || window.webkitAudioContext)();
     await this.ctx.resume();
-    await this.ctx.audioWorklet.addModule('./recorder-worklet.js');
+    // addModule は index.html の場所を基準に解決する。このファイルからの
+    // 相対で書くと外れるので、import.meta.url から組み立てる。
+    await this.ctx.audioWorklet.addModule(new URL('./recorder-worklet.js', import.meta.url));
 
     this.node = new AudioWorkletNode(this.ctx, 'recorder');
     this.node.port.onmessage = (event) => {

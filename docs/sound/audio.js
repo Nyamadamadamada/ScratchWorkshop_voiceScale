@@ -6,6 +6,7 @@ export const FADE_IN_MS = 10;
 export const FADE_OUT_MS = 30;
 export const PEAK_DB = -3;
 export const TRIM_TOP_DB = 35;
+const SILENCE = 1e-4; // これ以下は鳴っていないとみなす
 
 // 再生速度を ratio 倍にして、書き出し用のレートにそろえる。
 // ratio が大きいほど音は高く、そして短くなる。これが音階をつくる中心の処理で、
@@ -64,13 +65,23 @@ export function fitLength(x, n, sr) {
   const end = Math.min(x.length, n);
   out.set(x.subarray(0, end));
 
-  // 鳴り終わりには必ずフェードをかける。無音で埋めるときも要る。
-  // 掛けないと波形が振幅を持ったまま無音へ落ち、「プチッ」と鳴って
-  // 音が途中で切られたように聞こえる。
-  const fadeOut = Math.min(Math.floor((sr * FADE_OUT_MS) / 1000), end);
-  for (let i = 0; i < fadeOut; i += 1) out[end - fadeOut + i] *= 1 - i / (fadeOut - 1);
-  const fadeIn = Math.min(Math.floor((sr * FADE_IN_MS) / 1000), end);
-  for (let i = 0; i < fadeIn; i += 1) out[i] *= i / (fadeIn - 1);
+  // 鳴り終わりの位置は、長さではなく値を見て決める。
+  //
+  // ブラウザのリサンプラーは音を引き伸ばすとき、末尾を十数ミリ秒とりこぼす。
+  // 長さだけを見てフェードすると、その無音の上に掛かってしまい、実際の音は
+  // 振幅を持ったまま切れる。結果「プチッ」と鳴り、音が途中で切られたように
+  // 聞こえる。
+  let sound = end;
+  while (sound > 0 && Math.abs(out[sound - 1]) <= SILENCE) sound -= 1;
+
+  const fadeOut = Math.min(Math.floor((sr * FADE_OUT_MS) / 1000), sound);
+  if (fadeOut > 1) {
+    for (let i = 0; i < fadeOut; i += 1) out[sound - fadeOut + i] *= 1 - i / (fadeOut - 1);
+  }
+  const fadeIn = Math.min(Math.floor((sr * FADE_IN_MS) / 1000), sound);
+  if (fadeIn > 1) {
+    for (let i = 0; i < fadeIn; i += 1) out[i] *= i / (fadeIn - 1);
+  }
   return out;
 }
 

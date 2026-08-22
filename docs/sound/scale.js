@@ -8,15 +8,20 @@ export const NOTE_SEC = 0.5;      // 四分音符の長さ。テンポ120にあ�
 export const MAX_SOURCE_SEC = 1;  // ここまでを素材として使う
 
 // ファイル名がそのまま Scratch の音の名前になるので、子どもが読める日本語にする
+// name は画面に出す名前、file は WAV のファイル名。
+//
+// ファイル名はローマ字にする。日本語のままだと、UTF-8 のフラグを見ない古い
+// 展開ツールに当たったとき Windows で文字化けする。会場のパソコンはレンタルで
+// 中身を選べないので、危ない橋は渡らない。
 export const NOTES = [
-  { name: 'ド', semitone: 0 },
-  { name: 'レ', semitone: 2 },
-  { name: 'ミ', semitone: 4 },
-  { name: 'ファ', semitone: 5 },
-  { name: 'ソ', semitone: 7 },
-  { name: 'ラ', semitone: 9 },
-  { name: 'シ', semitone: 11 },
-  { name: '高いド', semitone: 12 },
+  { name: 'ド', file: 'do', semitone: 0 },
+  { name: 'レ', file: 're', semitone: 2 },
+  { name: 'ミ', file: 'mi', semitone: 4 },
+  { name: 'ファ', file: 'fa', semitone: 5 },
+  { name: 'ソ', file: 'so', semitone: 7 },
+  { name: 'ラ', file: 'ra', semitone: 9 },
+  { name: 'シ', file: 'si', semitone: 11 },
+  { name: '高いド', file: 'do_high', semitone: 12 },
 ];
 
 // 基準にできるオクターブの範囲。C2(65Hz) から C6(1046Hz) まで。
@@ -48,7 +53,11 @@ export async function build(x, f0, srcSr, noteSec = NOTE_SEC) {
     // 直列に回す。8回ぶんの OfflineAudioContext を同時に開くと端末によっては失敗する
     // eslint-disable-next-line no-await-in-loop
     const shifted = await resample(source, srcSr, target / f0);
-    sounds.push({ name: note.name, samples: normalize(fitLength(shifted, length, OUT_SR)) });
+    sounds.push({
+      name: note.name,
+      file: note.file,
+      samples: normalize(fitLength(shifted, length, OUT_SR)),
+    });
   }
   return sounds;
 }

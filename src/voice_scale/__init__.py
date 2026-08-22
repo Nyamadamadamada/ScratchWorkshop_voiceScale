@@ -1,33 +1,33 @@
-"""声から音階をつくる。
+"""できあがった音を測る。
 
-docs/ に置いた JavaScript 版と1対1で対応する。同じ名前のファイルに
-同じ処理が入っていて、同じ値を返す。ずれていないことは
-tests/test_parity.py で確かめる。
+音をつくるのは docs/ の JavaScript だけで、Python は同じ処理を持たない。
+役割をこう分けてある。
 
-    pitch  声の高さを測る        docs/pitch.js
-    check  音階にできるか判定する  docs/check.js
-    audio  長さと音量をそろえる    docs/audio.js
-    scale  8音をつくる           docs/scale.js
-    wav    WAV を読み書きする     docs/wav.js
-    cli    入り口                docs/app.js
+    Node    動かす。アプリ本体、見本音源づくり、実ブラウザでの通し確認
+    Python  測る。できた WAV を読んで、狙いどおりか確かめる
 
-Python 版は見本音源づくりと検証に使う。当日子どもが触るのは JavaScript 版。
+見本音源は `node tools/generate.mjs` がつくる。実ブラウザで docs/sound/ を
+そのまま動かすので、当日子どもが動かすコードと同じものを測ることになる。
 """
 
-from voice_scale.check import MESSAGES, judge
-from voice_scale.pitch import Pitch, detect
-from voice_scale.scale import NOTE_SEC, NOTES, Nearest, Sound, base_frequency, build, nearest_note
+from voice_scale.measure import (
+    NOTES,
+    Measured,
+    cents,
+    detected_hz,
+    interval_errors,
+    measure,
+    measure_scale,
+    strongest_hz,
+)
 
 __all__ = [
-    "MESSAGES",
     "NOTES",
-    "NOTE_SEC",
-    "Nearest",
-    "Pitch",
-    "Sound",
-    "base_frequency",
-    "build",
-    "detect",
-    "judge",
-    "nearest_note",
+    "Measured",
+    "cents",
+    "detected_hz",
+    "interval_errors",
+    "measure",
+    "measure_scale",
+    "strongest_hz",
 ]

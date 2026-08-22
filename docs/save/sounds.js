@@ -1,11 +1,12 @@
 // 録音1回ぶんの成果物。8音と、変換する前の声をまとめて持つ。
 
-import { OUT_SR } from './audio.js';
-import { nearestNote } from './scale.js';
-import { encodeWav } from './wav.js';
+import { OUT_SR } from '../sound/audio.js';
+import { nearestNote } from '../sound/scale.js';
+import { encodeWav } from '../sound/wav.js';
 import { createZip } from './zip.js';
 
-export const ZIP_NAME = '音階.zip';
+// ZIP の名前もローマ字。ファイル名まわりで日本語を使わないと決めておく。
+export const ZIP_NAME = 'onkai.zip';
 
 // ダウンロードが始まる前に URL を捨てると、端末によっては失敗する
 const REVOKE_DELAY_MS = 10000;
@@ -25,7 +26,7 @@ export class SoundSet {
   // まとめれば1回で済み、展開したときに8つが1つのフォルダにそろう。
   download() {
     const files = this.sounds.map((sound) => ({
-      name: `${sound.name}.wav`,
+      name: `${sound.file}.wav`,
       data: encodeWav(sound.samples, OUT_SR),
     }));
 

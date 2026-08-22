@@ -3,7 +3,7 @@
 // AudioContext を1つだけ持って使い回す。押すたびに作ると端末によっては
 // すぐ上限に達して鳴らなくなる。
 
-import { OUT_SR } from './audio.js';
+import { OUT_SR } from '../sound/audio.js';
 
 export class Player {
   constructor() {

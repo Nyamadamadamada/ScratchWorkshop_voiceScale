@@ -5,13 +5,13 @@
 //   2. できた8音を画面に並べる
 //   3. ダウンロードのボタンをつなぐ
 
-import { trim } from './audio.js';
-import { MESSAGES, judge } from './check.js';
-import { detect } from './pitch.js';
-import { Player } from './player.js';
-import { Recorder } from './recorder.js';
-import { build } from './scale.js';
-import { SoundSet, ZIP_NAME } from './sounds.js';
+import { Player } from './device/player.js';
+import { Recorder } from './device/recorder.js';
+import { SoundSet, ZIP_NAME } from './save/sounds.js';
+import { trim } from './sound/audio.js';
+import { MESSAGES, judge } from './sound/check.js';
+import { detect } from './sound/pitch.js';
+import { build } from './sound/scale.js';
 
 const COUNTDOWN_SEC = 3;
 const RECORD_SEC = 2;

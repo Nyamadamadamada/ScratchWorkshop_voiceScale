@@ -120,13 +120,13 @@ for (const [title, spec, expect] of CASES) {
       problems.push('ダウンロードが始まらない');
     } else {
       const name = download.suggestedFilename();
-      if (name !== '音階.zip') problems.push(`名前が違う: ${name}`);
+      if (name !== 'onkai.zip') problems.push(`名前が違う: ${name}`);
       const dir = `${OUT ?? '/tmp/vs_zip'}/${title.replace(/\s+/g, '_')}`;
       mkdirSync(dir, { recursive: true });
       await download.saveAs(`${dir}/${name}`);
 
       const zip = zipEntries(`${dir}/${name}`);
-      const want = ['ド', 'レ', 'ミ', 'ファ', 'ソ', 'ラ', 'シ', '高いド'];
+      const want = ['do', 're', 'mi', 'fa', 'so', 'ra', 'si', 'do_high'];
       if (!zip) problems.push('ZIP として読めない');
       else if (zip.count !== 8) problems.push(`ZIP の中身が ${zip.count} 個`);
       else {

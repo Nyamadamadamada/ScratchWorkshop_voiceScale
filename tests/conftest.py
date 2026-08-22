@@ -1,57 +1,85 @@
-"""テストで使う音をつくる。"""
+"""テストの下ごしらえ。
 
-import numpy as np
+音をつくるのは docs/ の JavaScript なので、テストもまずブラウザを回して
+WAV をつくらせる。そのあと Python でその WAV を測る。
+"""
+
+from __future__ import annotations
+
+import json
+import shutil
+import socket
+import subprocess
+import time
+from pathlib import Path
+
 import pytest
 
-from voice_scale.audio import OUT_SR
+ROOT = Path(__file__).resolve().parents[1]
+
+# ブラウザに通す入力。実際の子どもの声から、音階にできない音まで。
+CASES = [
+    {"id": "子どもの声300Hz", "tone": 300},
+    {"id": "大人の低い声110Hz", "tone": 110},
+    {"id": "低い声130Hz", "tone": 130.81},
+    {"id": "高い声784Hz", "tone": 784},
+    {"id": "とても高い声990Hz", "tone": 990},
+    {"id": "短い声", "tone": 300, "sec": 0.25},
+    {"id": "ホワイトノイズ", "noise": True},
+    {"id": "小さすぎる声", "tone": 300, "gain": 0.003},
+    {"id": "みじかすぎる声", "tone": 300, "sec": 0.1},
+]
+
+pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="node がない")
 
 
-@pytest.fixture
-def rng():
-    return np.random.default_rng(0)
+def 空きポート() -> int:
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
 
 
-def 声(hz: float, sec: float = 1.0, gain: float = 0.6) -> np.ndarray:
-    """倍音を持つ、人の声に近い合成音。"""
-    t = np.arange(int(OUT_SR * sec)) / OUT_SR
-    x = sum((1.0 / k) * np.sin(2.0 * np.pi * hz * k * t) for k in range(1, 6))
-    return gain * x / np.max(np.abs(x))
+@pytest.fixture(scope="session")
+def 生成結果(tmp_path_factory) -> dict[str, dict]:
+    """ブラウザを一度だけ立ち上げて、全ケースぶんの WAV をつくらせる。"""
+    if shutil.which("node") is None:
+        pytest.skip("node がない")
 
+    port = 空きポート()
+    server = subprocess.Popen(
+        ["python", "-m", "http.server", "-d", str(ROOT / "docs"), str(port)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        for _ in range(50):  # 立ち上がるまで待つ
+            try:
+                with socket.create_connection(("127.0.0.1", port), timeout=0.1):
+                    break
+            except OSError:
+                time.sleep(0.1)
 
-def 滑る声(start: float = 200.0, octaves: float = 1.5, sec: float = 1.0) -> np.ndarray:
-    """音程が上がり続ける声。音階にできない。"""
-    hz = start * 2.0 ** np.linspace(0.0, octaves, int(OUT_SR * sec))
-    return 0.5 * np.sin(2.0 * np.pi * np.cumsum(hz) / OUT_SR)
+        out = tmp_path_factory.mktemp("生成")
+        specs = out / "specs.json"
+        specs.write_text(json.dumps(CASES, ensure_ascii=False), encoding="utf-8")
 
+        生成 = ROOT / "tools" / "generate.mjs"
+        proc = subprocess.run(
+            ["node", str(生成), "--batch", str(specs), "--out", str(out)],
+            capture_output=True,
+            text=True,
+            env={**__import__("os").environ, "BASE_URL": f"http://127.0.0.1:{port}/"},
+            check=False,
+        )
+        if proc.returncode != 0:
+            pytest.fail(f"generate.mjs が失敗した:\n{proc.stdout}\n{proc.stderr}")
 
-def ゆれる声(hz: float = 300.0, cents: float = 48.0, sec: float = 1.0) -> np.ndarray:
-    """ビブラートのかかった声。多少ゆれても通す必要がある。"""
-    t = np.arange(int(OUT_SR * sec)) / OUT_SR
-    f = hz * 2.0 ** ((cents / 1200.0) * np.sin(2.0 * np.pi * 5.0 * t))
-    return 0.5 * np.sin(2.0 * np.pi * np.cumsum(f) / OUT_SR)
-
-
-def 拍手(rng: np.random.Generator) -> np.ndarray:
-    """短い衝撃音。音程が存在しない。"""
-    n = int(OUT_SR * 0.02)
-    click = rng.standard_normal(n) * np.exp(-np.linspace(0, 8, n))
-    return np.concatenate([0.9 * click, np.zeros(int(OUT_SR * 0.3))])
-
-
-def ささやき声(rng: np.random.Generator) -> np.ndarray:
-    """声帯が震えていないので、波が規則正しくならない。"""
-    x = np.convolve(rng.standard_normal(OUT_SR), np.hanning(64), "same")
-    return 0.3 * x / np.max(np.abs(x))
-
-
-def いちばん強い周波数(x: np.ndarray, sr: int = OUT_SR) -> float:
-    """倍音構成に左右されない、音の高さの指標。"""
-    n = 1 << 18
-    spectrum = np.abs(np.fft.rfft(x * np.hanning(len(x)), n=n))
-    freq = np.fft.rfftfreq(n, 1.0 / sr)
-    band = (freq > 50.0) & (freq < 20000.0)
-    return float(freq[band][np.argmax(spectrum[band])])
-
-
-def 半音差(a: float, b: float) -> float:
-    return 12.0 * np.log2(a / b)
+        結果 = {}
+        for case in CASES:
+            d = out / case["id"]
+            report = json.loads((d / "report.json").read_text(encoding="utf-8"))
+            結果[case["id"]] = {"dir": d, "report": report}
+        return 結果
+    finally:
+        server.terminate()
+        server.wait(timeout=5)
