@@ -1,12 +1,10 @@
-# こえで つくる がっき
+# 声から音階を作ろう
 
 声を録音して、その高さを測り、ドレミファソラシドの8音のWAVに変換する。
-Scratch の「音をアップロード」に読ませて、自分の声を楽器にする。
 
 https://nyamadamadamada.github.io/ScratchWorkshop_voiceScale/
 
 ブラウザだけで完結する静的サイト。サーバー処理はなく、録音した声は外に出ない。
-配信する JavaScript に外部依存はない。
 
 ```
 docs/               GitHub Pages で配信する一式
@@ -14,16 +12,23 @@ src/voice_scale/    Python 版。見本音源づくりと検証に使う
 tests/              テストの読みかたは tests/README.md
 ```
 
-## 動かす
+`docs/` と `src/voice_scale/` は1対1で対応する。`pitch` `check` `audio` `scale` `wav`
+は同じ名前のファイルに同じ処理が入っていて、同じ値を返す。ずれていないことは
+`tests/test_parity.py` で確かめる。
+
+純粋な計算は関数にする。クラスは後始末が要るものだけで、`Recorder` `Player` `SoundSet`
+の3つしかない。
+
+## 環境構築
 
 ```sh
 uv sync
-uv run python -m http.server -d docs 8765
+uv run python -m http.server -d docs 8760
 ```
 
-`http://localhost:8765/` を開く。`localhost` はセキュアコンテキスト扱いなのでマイクが使える。
+`http://localhost:8760/` を開く。`localhost` はセキュアコンテキスト扱いなのでマイクが使える。
 
-## 確認する
+## リンター/テスト
 
 ```sh
 uv run ruff check --fix . && uv run ruff format .

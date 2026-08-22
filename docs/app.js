@@ -1,17 +1,42 @@
-// 画面の制御。
+// 画面の配線。音づくりそのものは pitch/check/audio/scale が受け持つ。
+//
+// このファイルがすることは3つ。
+//   1. マイクのボタンから録音までの流れを進める
+//   2. できた8音を画面に並べる
+//   3. ダウンロードのボタンをつなぐ
 
-import { OUT_SR, trim } from './audio.js';
+import { trim } from './audio.js';
 import { MESSAGES, judge } from './check.js';
 import { detect } from './pitch.js';
+import { Player } from './player.js';
 import { Recorder } from './recorder.js';
-import { build, nearestNote } from './scale.js';
-import { encodeWav } from './wav.js';
+import { build } from './scale.js';
+import { SoundSet } from './sounds.js';
 
-const RECORDING_TEXT = '声を出して！';
 const COUNTDOWN_SEC = 3;
-const RECORD_SEC = 2; // 2秒録るが、使うのは最大1.0秒。
-// カウントダウン終了から声が出るまで0.3〜0.5秒のラグがあり、
-// さらに最高音は再生速度2倍で長さが半分になるため、元が1.0秒必要になる。
+const RECORD_SEC = 2;
+// 2秒録るが、使うのは最大1.0秒。カウントダウン終了から声が出るまで
+// 0.3〜0.5秒のラグがあり、さらに最高音は再生速度2倍で長さが半分になるため、
+// 元が1.0秒必要になる。
+
+const RING_MAX_SCALE = 2; // 音量が最大のときの輪の大きさ。ボタンの外まで届く
+const RING_GAIN = 2.2; // 平方根を通したあとの効き。声の大小が伝わる強さに合わせた
+
+const HINTS = {
+  idle: 'マイクを押してね',
+  asking: 'マイクの使用を許可してね',
+  counting: '準備して…',
+  recording: '声を出して！',
+  working: '作っています…',
+};
+const DOWNLOAD_HINTS = {
+  ready: '「ダウンロードしますか？」とアラートが出たら「許可」を押してね',
+  done: '8つの音声ファイルがダウンロードされました',
+};
+const MIC_ERRORS = {
+  NotAllowedError: 'マイクを使う許可を押してね',
+  default: 'マイクが見つかりません。先生を呼んでね',
+};
 
 const $ = (id) => document.getElementById(id);
 const micButton = $('mic-button');
@@ -19,179 +44,152 @@ const countLabel = $('count');
 const recordHint = $('record-hint');
 const recordError = $('record-error');
 const ring = document.querySelector('.mic-ring');
+const downloadButton = $('download-all');
 
 const recorder = new Recorder();
-let playbackCtx = null;
-let notes = [];
-let objectUrls = [];
-let original = null; // 変換する前の、録音したままの声
+const player = new Player();
+let soundSet = null;
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
-function showScreen(step) {
+// ── 画面 ────────────────────────────────────────────
+
+function showScreen(name) {
   for (const section of document.querySelectorAll('.screen')) {
     section.removeAttribute('data-active');
   }
-  $(`screen-${step}`).setAttribute('data-active', '');
+  $(`screen-${name}`).setAttribute('data-active', '');
   window.scrollTo(0, 0);
 }
+
+// 押している間だけ見た目を変える。鳴り終わったら戻す。
+async function playWith(button, samples, sr) {
+  button.setAttribute('data-playing', '');
+  const source = await player.play(samples, sr);
+  source.onended = () => button.removeAttribute('data-playing');
+}
+
+function renderSounds() {
+  const box = $('result-keys');
+  box.textContent = '';
+  for (const sound of soundSet.sounds) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'key';
+    button.textContent = sound.name;
+    // 録音した声にいちばん近い音には目印をつける
+    if (sound.name === soundSet.nearest.name) button.setAttribute('data-near', '');
+    button.addEventListener('click', () => playWith(button, sound.samples));
+    box.append(button);
+  }
+  $('near-note').innerHTML = `君の声に近い音は <b>${soundSet.nearest.name}</b>`;
+  $('download-hint').textContent = DOWNLOAD_HINTS.ready;
+}
+
+// ── マイク ──────────────────────────────────────────
 
 function setMicState(state) {
   if (state) micButton.dataset.state = state;
   else delete micButton.dataset.state;
   micButton.disabled = Boolean(state);
+  recordHint.textContent = HINTS[state ?? 'idle'];
 }
 
-// 音量に応じて輪を広げる。声が届いていることを見せるための表示。
+// 音量に応じて輪を広げる。声が届いていることを見せるための表示で、
+// 輪が動かなければそのパソコンのマイクが壊れているとその場で分かる。
 //
 // 平方根を通してから広げる。そのまま使うと少し大きい声ですぐ上限に張りつき、
-// 声の大小が伝わらない。上限の2倍でボタンの外側まで届く。
-const RING_MAX_SCALE = 2;
-
+// 声の大小が伝わらない。
 function animateRing() {
   if (micButton.dataset.state !== 'recording') return;
-  const loudness = Math.min(1, Math.sqrt(recorder.level) * 2.2);
-  const scale = 1 + (RING_MAX_SCALE - 1) * loudness;
-  ring.setAttribute('transform', `scale(${scale.toFixed(3)})`);
+  const loudness = Math.min(1, Math.sqrt(recorder.level) * RING_GAIN);
+  ring.setAttribute('transform', `scale(${(1 + (RING_MAX_SCALE - 1) * loudness).toFixed(3)})`);
   requestAnimationFrame(animateRing);
 }
 
-async function play(samples, sr = OUT_SR) {
-  if (!playbackCtx) {
-    playbackCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  await playbackCtx.resume();
-  const buffer = playbackCtx.createBuffer(1, samples.length, sr);
-  buffer.copyToChannel(samples, 0);
-  const source = playbackCtx.createBufferSource();
-  source.buffer = buffer;
-  source.connect(playbackCtx.destination);
-  source.start();
-  return source;
-}
+// ── 録音の流れ ──────────────────────────────────────
 
-// 8つの音のボタンを並べる。録音した声にいちばん近い音には目印をつける。
-function renderKeys(box, near, onClick) {
-  box.textContent = '';
-  for (const note of notes) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'key';
-    button.textContent = note.name;
-    if (note.name === near) button.setAttribute('data-near', '');
-    button.addEventListener('click', () => onClick(note, button));
-    box.append(button);
-  }
-}
-
-function renderResult(f0) {
-  const near = nearestNote(f0);
-  renderKeys($('result-keys'), near.name, async (note, button) => {
-    button.setAttribute('data-playing', '');
-    const source = await play(note.samples);
-    source.onended = () => button.removeAttribute('data-playing');
-  });
-  $('near-note').innerHTML = `君の声に近い音は <b>${near.name}</b>`;
-
-  for (const url of objectUrls) URL.revokeObjectURL(url);
-  objectUrls = notes.map((note) => URL.createObjectURL(encodeWav(note.samples, OUT_SR)));
-  $('download-hint').textContent =
-    '「まとめてダウンロードしますか？」と出たら「許可」を押してね';
-}
-
-// 8つまとめて保存する。ブラウザが「複数ファイルのダウンロード」を一度だけ確認してくる。
-async function downloadAll(button) {
-  button.disabled = true;
-  const original = button.textContent;
-  for (let i = 0; i < notes.length; i += 1) {
-    const link = document.createElement('a');
-    link.href = objectUrls[i];
-    link.download = `${notes[i].name}.wav`;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    button.textContent = `保存中… ${i + 1} / ${notes.length}`;
-    await sleep(250);
-  }
-  button.textContent = original;
-  button.disabled = false;
-  $('download-hint').textContent = 'ダウンロードフォルダに8つ入っているか見てみよう';
-}
-
-async function record() {
-  recordError.textContent = '';
-
-  // マイクの許可
+async function openMic() {
   setMicState('asking');
-  recordHint.textContent = 'マイクの使用を許可してね';
   try {
     await recorder.open();
+    return true;
   } catch (err) {
     setMicState(null);
-    recordHint.textContent = 'マイクを押してね';
-    recordError.textContent =
-      err && err.name === 'NotAllowedError'
-        ? 'マイクを使う許可を押してね'
-        : 'マイクが見つかりません。先生を呼んでね';
-    return;
+    recordError.textContent = MIC_ERRORS[err?.name] ?? MIC_ERRORS.default;
+    return false;
   }
+}
 
-  // カウントダウン
+async function captureVoice() {
   setMicState('counting');
-  recordHint.textContent = '準備して…';
   for (let n = COUNTDOWN_SEC; n > 0; n -= 1) {
     countLabel.textContent = String(n);
     await sleep(1000);
   }
 
-  // 録音
   setMicState('recording');
-  recordHint.textContent = RECORDING_TEXT;
   recorder.start();
   animateRing();
   // 残り秒数はマイクの絵に重ねず、下の行に出す。重ねると読めない。
   countLabel.textContent = '';
   for (let left = RECORD_SEC; left > 0; left -= 1) {
-    recordHint.textContent = `${RECORDING_TEXT}　あと ${left}秒`;
+    recordHint.textContent = `${HINTS.recording}　あと ${left}秒`;
     await sleep(1000);
   }
-  const raw = recorder.stop();
-  const sr = recorder.sampleRate;
+  return { samples: recorder.stop(), sr: recorder.sampleRate };
+}
 
-  // 判定
+async function record() {
+  recordError.textContent = '';
+  if (!(await openMic())) return;
+
+  const raw = await captureVoice();
+
   setMicState('working');
   countLabel.textContent = '';
-  recordHint.textContent = '作っています…';
   await sleep(0); // 画面を描き直させてから重い処理に入る
 
-  const wave = trim(raw);
-  const pitch = detect(wave, sr);
-  const reasons = judge(wave, sr, pitch);
-
+  const wave = trim(raw.samples);
+  const pitch = detect(wave, raw.sr);
+  const reasons = judge(wave, raw.sr, pitch);
   setMicState(null);
-  recordHint.textContent = 'マイクを押してね';
 
   if (reasons.length > 0) {
-    recordError.innerHTML = reasons.map((r) => MESSAGES[r]).join('<br />');
+    recordError.innerHTML = reasons.map((reason) => MESSAGES[reason]).join('<br />');
     return;
   }
 
-  original = { samples: Float32Array.from(wave), sr };
-  notes = await build(wave, pitch.f0, sr);
-  renderResult(pitch.f0);
+  if (soundSet) soundSet.dispose();
+  soundSet = new SoundSet(
+    await build(wave, pitch.f0, raw.sr),
+    { samples: Float32Array.from(wave), sr: raw.sr },
+    pitch.f0
+  );
+  renderSounds();
   showScreen('result');
 }
 
+// ── 配線 ────────────────────────────────────────────
+
 micButton.addEventListener('click', record);
 
-$('play-original').addEventListener('click', async (event) => {
-  if (!original) return;
-  const button = event.currentTarget;
-  button.setAttribute('data-playing', '');
-  const source = await play(original.samples, original.sr);
-  source.onended = () => button.removeAttribute('data-playing');
+$('play-original').addEventListener('click', (event) => {
+  if (!soundSet) return;
+  playWith(event.currentTarget, soundSet.original.samples, soundSet.original.sr);
 });
-$('download-all').addEventListener('click', (event) => downloadAll(event.currentTarget));
+
+downloadButton.addEventListener('click', async () => {
+  if (!soundSet) return;
+  const label = downloadButton.textContent;
+  downloadButton.disabled = true;
+  await soundSet.downloadAll((done, total) => {
+    downloadButton.textContent = `保存中… ${done} / ${total}`;
+  });
+  downloadButton.textContent = label;
+  downloadButton.disabled = false;
+  $('download-hint').textContent = DOWNLOAD_HINTS.done;
+});
 
 for (const button of document.querySelectorAll('[data-goto]')) {
   button.addEventListener('click', () => showScreen(button.dataset.goto));

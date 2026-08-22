@@ -1,4 +1,3 @@
-// 会場の Wi-Fi が細いので、初回に読み込んだら以降は通信なしで動くようにする。
 const CACHE = 'voice-scale-v1';
 const FILES = [
   './',
@@ -11,6 +10,8 @@ const FILES = [
   './scale.js',
   './wav.js',
   './recorder.js',
+  './player.js',
+  './sounds.js',
   './recorder-worklet.js',
   './manifest.webmanifest',
 ];

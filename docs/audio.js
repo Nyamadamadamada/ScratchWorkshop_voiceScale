@@ -7,8 +7,28 @@ export const FADE_OUT_MS = 30;
 export const PEAK_DB = -3;
 export const TRIM_TOP_DB = 35;
 
+// 再生速度を ratio 倍にして、書き出し用のレートにそろえる。
+// ratio が大きいほど音は高く、そして短くなる。これが音階をつくる中心の処理で、
+// サンプラーという楽器が昔からやっている方式と同じ。
+//
+// Python 版は numpy.interp で同じことをする。ブラウザではリサンプラーを
+// 自前で書かず、OfflineAudioContext の playbackRate に任せる。
+export async function resample(samples, srcSr, ratio) {
+  const length = Math.max(1, Math.ceil((OUT_SR * samples.length) / (srcSr * ratio)));
+  const ctx = new OfflineAudioContext(1, length, OUT_SR);
+  const buffer = ctx.createBuffer(1, samples.length, srcSr);
+  buffer.copyToChannel(Float32Array.from(samples), 0);
+
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.playbackRate.value = ratio;
+  source.connect(ctx.destination);
+  source.start();
+  const rendered = await ctx.startRendering();
+  return rendered.getChannelData(0);
+}
+
 // 前後の無音を削る。閾値はピーク音量からの相対値。
-// 会場は子どもが十数人いて暗騒音が大きく、絶対値の閾値ではカットが効かない。
 export function trim(x, topDb = TRIM_TOP_DB, frame = 1024, hop = 256) {
   if (x.length < frame) return x;
   const count = 1 + Math.floor((x.length - frame) / hop);
@@ -41,13 +61,15 @@ export function trim(x, topDb = TRIM_TOP_DB, frame = 1024, hop = 256) {
 // 8音の長さがそろっていないとメロディのテンポが崩れる。
 export function fitLength(x, n, sr) {
   const out = new Float32Array(n);
-  out.set(x.subarray(0, Math.min(x.length, n)));
+  const end = Math.min(x.length, n);
+  out.set(x.subarray(0, end));
 
-  if (x.length > n) {
-    const fade = Math.min(Math.floor((sr * FADE_OUT_MS) / 1000), n);
-    for (let i = 0; i < fade; i += 1) out[n - fade + i] *= 1 - i / (fade - 1);
-  }
-  const fadeIn = Math.min(Math.floor((sr * FADE_IN_MS) / 1000), n);
+  // 鳴り終わりには必ずフェードをかける。無音で埋めるときも要る。
+  // 掛けないと波形が振幅を持ったまま無音へ落ち、「プチッ」と鳴って
+  // 音が途中で切られたように聞こえる。
+  const fadeOut = Math.min(Math.floor((sr * FADE_OUT_MS) / 1000), end);
+  for (let i = 0; i < fadeOut; i += 1) out[end - fadeOut + i] *= 1 - i / (fadeOut - 1);
+  const fadeIn = Math.min(Math.floor((sr * FADE_IN_MS) / 1000), end);
   for (let i = 0; i < fadeIn; i += 1) out[i] *= i / (fadeIn - 1);
   return out;
 }

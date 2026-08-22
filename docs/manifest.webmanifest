@@ -1,6 +1,6 @@
 {
-  "name": "こえで つくる がっき",
-  "short_name": "こえがっき",
+  "name": "声から音階を作ろう",
+  "short_name": "音階を作ろう",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

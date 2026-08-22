@@ -2,7 +2,7 @@
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 
-const BASE = process.env.BASE_URL ?? 'http://localhost:8765/';
+const BASE = process.env.BASE_URL ?? 'http://localhost:8760/';
 const OUT = process.argv[2] ?? '/tmp/vs_shot';
 mkdirSync(OUT, { recursive: true });
 

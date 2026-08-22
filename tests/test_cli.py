@@ -3,13 +3,14 @@
 import numpy as np
 from conftest import 声
 
-from voice_scale.audio import SR, write_wav
+from voice_scale import wav
+from voice_scale.audio import OUT_SR
 from voice_scale.cli import main
 
 
 def 音源(tmp_path, x, name="test.wav"):
     path = tmp_path / name
-    write_wav(path, x, SR)
+    wav.write(path, x, OUT_SR)
     return path
 
 
@@ -24,7 +25,7 @@ def test_声を渡すと8つのWAVができる(tmp_path):
 
 
 def test_音階にできない音は書き出さずに失敗する(tmp_path, rng):
-    src = 音源(tmp_path, 0.5 * rng.standard_normal(SR))
+    src = 音源(tmp_path, 0.5 * rng.standard_normal(OUT_SR))
     out = tmp_path / "見本"
     assert main(["build", str(src), "-o", str(out)]) == 1
     assert not out.exists()
@@ -36,7 +37,7 @@ def test_ファイルがなければ失敗する(tmp_path):
 
 def test_infoは音階にできるかを終了コードで返す(tmp_path, rng):
     assert main(["info", str(音源(tmp_path, 声(300.0), "ok.wav"))]) == 0
-    assert main(["info", str(音源(tmp_path, np.zeros(SR), "ng.wav"))]) == 1
+    assert main(["info", str(音源(tmp_path, np.zeros(OUT_SR), "ng.wav"))]) == 1
 
 
 def test_1音の長さを変えられる(tmp_path):

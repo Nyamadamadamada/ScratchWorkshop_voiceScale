@@ -1,5 +1,7 @@
 """音階にできない音を弾く。
 
+docs/check.js と対になる。
+
 無声音やノイズは声帯が震えていないので波が規則正しくならず、
 原理的に音程が存在しない。
 """
@@ -41,8 +43,3 @@ def judge(x: np.ndarray, sr: int, pitch: Pitch) -> list[str]:
     elif pitch.spread_cents > MAX_SPREAD_CENTS:
         reasons.append("unstable")
     return reasons
-
-
-def describe(reasons: list[str]) -> str:
-    """画面に出す文言を組み立てる。"""
-    return "\n".join(MESSAGES[r] for r in reasons)

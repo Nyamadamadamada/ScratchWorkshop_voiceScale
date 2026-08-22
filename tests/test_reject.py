@@ -9,14 +9,14 @@ import numpy as np
 import pytest
 from conftest import ささやき声, ゆれる声, 声, 拍手, 滑る声
 
-from voice_scale.audio import SR, trim
+from voice_scale.audio import OUT_SR, trim
 from voice_scale.check import MESSAGES, judge
 from voice_scale.pitch import detect
 
 
 def 判定(x: np.ndarray) -> list[str]:
     x = trim(x)
-    return judge(x, SR, detect(x, SR))
+    return judge(x, OUT_SR, detect(x, OUT_SR))
 
 
 def test_ふつうの声は通る():
@@ -33,7 +33,7 @@ def test_多少ゆれる声も通す():
 
 
 def test_ノイズは音程がないので弾く(rng):
-    assert 判定(0.5 * rng.standard_normal(SR)) == ["unpitched"]
+    assert 判定(0.5 * rng.standard_normal(OUT_SR)) == ["unpitched"]
 
 
 def test_ささやき声は弾く(rng):
@@ -57,7 +57,7 @@ def test_音程が滑る声は弾く():
 
 
 def test_無音は弾く():
-    assert 判定(np.zeros(SR)) != []
+    assert 判定(np.zeros(OUT_SR)) != []
 
 
 @pytest.mark.parametrize("key", ["quiet", "short", "unpitched", "unstable"])

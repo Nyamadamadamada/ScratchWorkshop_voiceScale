@@ -1,12 +1,11 @@
 """YIN法による基本周波数の検出。
 
-docs/pitch.js と同じアルゴリズムを実装している。
-両者が一致することは tests/test_pitch.py で確認する。
+docs/pitch.js と対になる。同じ値を返すことは tests/test_parity.py で確認する。
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from typing import NamedTuple
 
 import numpy as np
 
@@ -18,8 +17,7 @@ FMIN = 80.0
 FMAX = 1000.0
 
 
-@dataclass(frozen=True)
-class Pitch:
+class Pitch(NamedTuple):
     """検出結果。"""
 
     f0: float  # 有声窓の中央値[Hz]。有声窓がなければ nan

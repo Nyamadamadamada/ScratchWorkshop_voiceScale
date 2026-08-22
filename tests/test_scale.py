@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from conftest import いちばん強い周波数, 半音差, 声
 
-from voice_scale.audio import SR
+from voice_scale.audio import OUT_SR
 from voice_scale.pitch import detect
 from voice_scale.scale import NOTE_SEC, NOTES, base_frequency, build, nearest_note
 
@@ -15,14 +15,15 @@ from voice_scale.scale import NOTE_SEC, NOTES, base_frequency, build, nearest_no
 声の高さ = [85.0, 110.0, 130.81, 200.0, 300.0, 440.0, 784.0, 1000.0]
 
 
-def 音階をつくる(hz: float):
+def 音階をつくる(hz: float) -> dict[str, np.ndarray]:
     x = 声(hz)
-    return build(x, detect(x, SR).f0)
+    return {sound.name: sound.samples for sound in build(x, detect(x, OUT_SR).f0)}
 
 
 def test_声を入れると8つの音ができる():
-    notes = 音階をつくる(300.0)
-    assert list(notes) == ["ド", "レ", "ミ", "ファ", "ソ", "ラ", "シ", "高いド"]
+    x = 声(300.0)
+    sounds = build(x, detect(x, OUT_SR).f0)
+    assert [s.name for s in sounds] == ["ド", "レ", "ミ", "ファ", "ソ", "ラ", "シ", "高いド"]
 
 
 @pytest.mark.parametrize("hz", 声の高さ)
@@ -33,7 +34,7 @@ def test_8つの音は同じ長さになる(hz):
     リサンプリングは低い音ほど長くなるため、放っておくとそろわない。
     """
     lengths = {len(w) for w in 音階をつくる(hz).values()}
-    assert lengths == {round(SR * NOTE_SEC)}
+    assert lengths == {round(OUT_SR * NOTE_SEC)}
 
 
 @pytest.mark.parametrize("hz", 声の高さ)
@@ -41,8 +42,9 @@ def test_ドレミの音程が正しく並ぶ(hz):
     notes = 音階をつくる(hz)
     ド = いちばん強い周波数(notes["ド"])
     ずれ = {
-        name: 1200.0 * np.log2(いちばん強い周波数(notes[name]) / ド / 2.0 ** (semitone / 12.0))
-        for name, semitone in NOTES
+        note.name: 1200.0
+        * np.log2(いちばん強い周波数(notes[note.name]) / ド / 2.0 ** (note.semitone / 12.0))
+        for note in NOTES
     }
     悪い = {k: round(v, 1) for k, v in ずれ.items() if abs(v) > 15.0}
     assert not 悪い, f"音程がずれた: {悪い}"
@@ -50,20 +52,26 @@ def test_ドレミの音程が正しく並ぶ(hz):
 
 @pytest.mark.parametrize("hz", 声の高さ)
 def test_声の高さがそのまま活きる(hz):
-    """録音した声と、できあがった「ド」の高さが大きく離れないこと。
+    """録音した声と、できあがった「ド」の高さが上下6半音以内に収まること。
 
-    以前は基準を C4 に固定していたため、大人の低い声（110Hz）が15半音も
-    持ち上げられ、まるで別人の声になっていた。上へ大きくずらさないことが要件。
+    ここが崩れると、本人の声に聞こえなくなる。以前オクターブの範囲を C4〜C5 に
+    絞っていたため、低い声（110Hz）は15半音持ち上げられ、高い声（990Hz）は
+    ドが半オクターブ下がって「どーん」と鳴っていた。
     """
-    base, _ = base_frequency(hz)
-    assert 半音差(base, hz) <= 6.0, f"{hz}Hz が {半音差(base, hz):.1f}半音 高くなる"
+    ずれ = 半音差(base_frequency(hz).hz, hz)
+    assert abs(ずれ) <= 6.0, f"{hz}Hz が {ずれ:+.1f}半音 ずれる"
 
 
 @pytest.mark.parametrize("hz", 声の高さ)
-def test_高い声でも耳に刺さる音にならない(hz):
-    """基準の上限を外すと、高い声で最高音が2000Hzを超えて金切り声になる。"""
-    base, _ = base_frequency(hz)
-    assert base * 2.0 <= 1100.0
+def test_鳴り終わりがプチッと切れない(hz):
+    """無音で埋める音にもフェードアウトが要る。
+
+    掛けないと波形が振幅を持ったまま無音へ落ち、音が途中で切られたように
+    聞こえる。短い録音では8音すべてが無音で埋まるので、全部に出る。
+    """
+    for sound in build(声(hz, sec=0.25), hz):
+        鳴っている = np.nonzero(np.abs(sound.samples) > 1e-4)[0]
+        assert abs(sound.samples[鳴っている[-1]]) < 0.01
 
 
 @pytest.mark.parametrize(
@@ -80,8 +88,8 @@ def test_高い声でも耳に刺さる音にならない(hz):
 )
 def test_録音した声に近い音を言い当てる(hz, 音名):
     """画面に「君の声に近い音は◯◯」と出すために使う。"""
-    name, cents = nearest_note(hz)
-    assert (name, abs(cents) < 10.0) == (音名, True)
+    near = nearest_note(hz)
+    assert (near.name, abs(near.cents) < 10.0) == (音名, True)
 
 
 def test_音量がそろう():

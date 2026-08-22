@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 from conftest import ささやき声, ゆれる声, 声, 拍手, 滑る声
 
-from voice_scale.audio import SR, trim
+from voice_scale.audio import OUT_SR, fit_length, normalize, trim
 from voice_scale.check import judge
 from voice_scale.pitch import detect
 from voice_scale.scale import base_frequency, nearest_note
@@ -33,14 +33,25 @@ def 入力一式() -> dict[str, np.ndarray]:
         "高い声784Hz": 声(783.99),
         "ビブラート": ゆれる声(),
         "音程が滑る声": 滑る声(),
-        "ホワイトノイズ": 0.5 * rng.standard_normal(SR),
+        "ホワイトノイズ": 0.5 * rng.standard_normal(OUT_SR),
         "ささやき声": ささやき声(rng),
         "拍手": 拍手(rng),
         "小さすぎる声": 声(300.0, gain=0.002),
         "前後に無音がある声": np.concatenate(
-            [np.zeros(SR // 2), 声(300.0, sec=0.6), np.zeros(SR // 2)]
+            [np.zeros(OUT_SR // 2), 声(300.0, sec=0.6), np.zeros(OUT_SR // 2)]
         ),
     }
+
+
+def fitted(x: np.ndarray) -> dict:
+    """長さと音量をそろえたあと、鳴り終わりの振幅がどうなるか。
+
+    フェードが抜けているとここに差が出る。
+    """
+    out = normalize(fit_length(x, 22050, 44100))
+    loud = np.nonzero(np.abs(out) > 1e-4)[0]
+    end = float(abs(out[loud[-1]])) if len(loud) else 0.0
+    return {"length": len(out), "end": round(end, 4)}
 
 
 @pytest.fixture(scope="module")
@@ -49,7 +60,10 @@ def 両方の結果():
     JS_DIR.mkdir(parents=True, exist_ok=True)
     (JS_DIR / "cases.json").write_text(
         json.dumps(
-            {n: {"sr": SR, "samples": [round(float(v), 7) for v in x]} for n, x in cases.items()}
+            {
+                n: {"sr": OUT_SR, "samples": [round(float(v), 7) for v in x]}
+                for n, x in cases.items()
+            }
         ),
         encoding="utf-8",
     )
@@ -63,16 +77,17 @@ def 両方の結果():
     py = {}
     for name, x in cases.items():
         t = trim(x)
-        p = detect(t, SR)
+        p = detect(t, OUT_SR)
         ok = np.isfinite(p.f0)
         py[name] = {
             "trimmed": len(t),
             "frames": p.frames,
             "voicedRatio": p.voiced_ratio,
             "f0": p.f0 if ok else None,
-            "reasons": judge(t, SR, p),
-            "base": base_frequency(p.f0)[0] if ok else None,
-            "near": nearest_note(p.f0)[0] if ok else None,
+            "reasons": judge(t, OUT_SR, p),
+            "base": base_frequency(p.f0).hz if ok else None,
+            "near": nearest_note(p.f0).name if ok else None,
+            "fitted": fitted(t),
         }
     return py, js
 
@@ -102,6 +117,14 @@ def test_声の高さの検出が一致する(両方の結果):
 
 def test_音階にできるかの判定が一致する(両方の結果):
     突き合わせ(両方の結果, "reasons", lambda a, b: a == b)
+
+
+def test_長さと音量のそろえかたが一致する(両方の結果):
+    突き合わせ(
+        両方の結果,
+        "fitted",
+        lambda a, b: a["length"] == b["length"] and abs(a["end"] - b["end"]) < 0.002,
+    )
 
 
 def test_基準の音と近い音の答えが一致する(両方の結果):

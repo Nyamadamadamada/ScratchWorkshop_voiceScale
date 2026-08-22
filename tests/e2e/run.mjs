@@ -5,11 +5,11 @@
 // 検証したいのは自分たちのコードなので、これで足りる。
 //
 //   npm test            # サーバーを立ててから実行する
-//   python3 -m http.server -d docs 8765
+//   python3 -m http.server -d docs 8760
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
-const BASE = process.env.BASE_URL ?? 'http://localhost:8765/';
+const BASE = process.env.BASE_URL ?? 'http://localhost:8760/';
 const OUT = process.env.OUT_DIR ?? null;
 
 // [名前, 波形を作る関数のソース, 期待する結果]

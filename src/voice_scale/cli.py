@@ -1,7 +1,6 @@
-"""コマンドライン。
+"""コマンドライン。見本音源をつくるときに使う。
 
-voice-scale info  素材/にゃー.mp3
-voice-scale build 素材/にゃー.mp3 -o 見本/
+ブラウザ側の入り口は docs/app.js。
 """
 
 from __future__ import annotations
@@ -9,13 +8,15 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 import numpy as np
 
-from voice_scale.audio import SR, load, trim, write_wav
+from voice_scale import wav
+from voice_scale.audio import OUT_SR, trim
 from voice_scale.check import MESSAGES, judge
-from voice_scale.pitch import detect
-from voice_scale.scale import NOTE_SEC, base_frequency, build
+from voice_scale.pitch import Pitch, detect
+from voice_scale.scale import NOTE_SEC, base_frequency, build, nearest_note
 
 NOTE_NAMES = ("ド", "ド#", "レ", "レ#", "ミ", "ファ", "ファ#", "ソ", "ソ#", "ラ", "ラ#", "シ")
 
@@ -28,50 +29,59 @@ def note_name(hz: float) -> str:
     return f"{NOTE_NAMES[semitone % 12]}{semitone // 12}"
 
 
-def analyze(path: Path):
-    """読み込み、無音を削り、音程を測る。"""
-    raw = load(path)
-    x = trim(raw)
-    pitch = detect(x, SR)
-    return x, pitch, judge(x, SR, pitch)
+class Analysis(NamedTuple):
+    """読み込みから判定までの結果をまとめたもの。"""
+
+    wave: np.ndarray
+    pitch: Pitch
+    reasons: list[str]
+
+
+def analyze(path: Path) -> Analysis:
+    """読み込み、無音を削り、音程を測り、音階にできるか判定する。"""
+    wave = trim(wav.load(path))
+    pitch = detect(wave, OUT_SR)
+    return Analysis(wave, pitch, judge(wave, OUT_SR, pitch))
 
 
 def cmd_info(args: argparse.Namespace) -> int:
-    x, pitch, reasons = analyze(args.input)
-    peak = float(np.max(np.abs(x))) if len(x) else 0.0
+    wave, pitch, reasons = analyze(args.input)
+    peak = float(np.max(np.abs(wave))) if len(wave) else 0.0
     print(f"{args.input.name}")
-    print(f"  長さ      {len(x) / SR:.2f} 秒")
+    print(f"  長さ      {len(wave) / OUT_SR:.2f} 秒")
     print(f"  ピーク    {peak:.3f}")
     print(f"  有声率    {pitch.voiced_ratio:.0%}  ({pitch.frames} 窓)")
     print(f"  ばらつき  {pitch.spread_cents:.0f} セント")
     if reasons:
         print("  判定      音階にできない")
-        for r in reasons:
-            print(f"            - {MESSAGES[r]}")
+        for reason in reasons:
+            print(f"            - {MESSAGES[reason]}")
         return 1
-    base, k = base_frequency(pitch.f0)
+    base = base_frequency(pitch.f0)
+    near = nearest_note(pitch.f0)
     print(f"  高さ      {pitch.f0:.1f} Hz  ({note_name(pitch.f0)})")
-    print(f"  基準のド  {base:.1f} Hz  (C{4 + k})")
+    print(f"  近い音    {near.name}  ({near.cents:+.0f} セント)")
+    print(f"  基準のド  {base.hz:.1f} Hz  (C{4 + base.octave})")
     print("  判定      音階にできる")
     return 0
 
 
 def cmd_build(args: argparse.Namespace) -> int:
-    x, pitch, reasons = analyze(args.input)
+    wave, pitch, reasons = analyze(args.input)
     if reasons:
         print(f"{args.input.name} は音階にできません", file=sys.stderr)
-        for r in reasons:
-            print(f"  {MESSAGES[r]}", file=sys.stderr)
+        for reason in reasons:
+            print(f"  {MESSAGES[reason]}", file=sys.stderr)
         return 1
 
     out_dir: Path = args.out
     out_dir.mkdir(parents=True, exist_ok=True)
-    _, k = base_frequency(pitch.f0)
-    print(f"{args.input.name}  {pitch.f0:.1f}Hz ({note_name(pitch.f0)})  基準 C{4 + k}")
+    base = base_frequency(pitch.f0)
+    print(f"{args.input.name}  {pitch.f0:.1f}Hz ({note_name(pitch.f0)})  基準 C{4 + base.octave}")
 
-    for name, wave in build(x, pitch.f0, SR, args.note_sec).items():
-        write_wav(out_dir / f"{name}.wav", wave)
-        print(f"  {name:5s} {len(wave) / SR:.3f}秒  {name}.wav")
+    for sound in build(wave, pitch.f0, OUT_SR, args.note_sec):
+        wav.write(out_dir / f"{sound.name}.wav", sound.samples)
+        print(f"  {sound.name:5s} {len(sound.samples) / OUT_SR:.3f}秒  {sound.name}.wav")
     print(f"→ {out_dir}")
     return 0
 
