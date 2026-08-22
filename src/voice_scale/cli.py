@@ -1,6 +1,6 @@
 """コマンドライン。見本音源をつくるときに使う。
 
-ブラウザ側の入り口は docs/app.js。
+ブラウザ側の入り口は app/app.js。
 """
 
 from __future__ import annotations

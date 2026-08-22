@@ -11,7 +11,7 @@ import { detect } from './pitch.js';
 import { Player } from './player.js';
 import { Recorder } from './recorder.js';
 import { build } from './scale.js';
-import { SoundSet } from './sounds.js';
+import { SoundSet, ZIP_NAME } from './sounds.js';
 
 const COUNTDOWN_SEC = 3;
 const RECORD_SEC = 2;
@@ -30,8 +30,8 @@ const HINTS = {
   working: '作っています…',
 };
 const DOWNLOAD_HINTS = {
-  ready: '「ダウンロードしますか？」とアラートが出たら「許可」を押してね',
-  done: '8つの音声ファイルがダウンロードされました',
+  ready: `8つの音が ${ZIP_NAME} にまとまって保存されるよ`,
+  done: `${ZIP_NAME} を開くと、8つの音が入っているよ`,
 };
 const MIC_ERRORS = {
   NotAllowedError: 'マイクを使う許可を押してね',
@@ -160,7 +160,6 @@ async function record() {
     return;
   }
 
-  if (soundSet) soundSet.dispose();
   soundSet = new SoundSet(
     await build(wave, pitch.f0, raw.sr),
     { samples: Float32Array.from(wave), sr: raw.sr },
@@ -179,15 +178,9 @@ $('play-original').addEventListener('click', (event) => {
   playWith(event.currentTarget, soundSet.original.samples, soundSet.original.sr);
 });
 
-downloadButton.addEventListener('click', async () => {
+downloadButton.addEventListener('click', () => {
   if (!soundSet) return;
-  const label = downloadButton.textContent;
-  downloadButton.disabled = true;
-  await soundSet.downloadAll((done, total) => {
-    downloadButton.textContent = `保存中… ${done} / ${total}`;
-  });
-  downloadButton.textContent = label;
-  downloadButton.disabled = false;
+  soundSet.download();
   $('download-hint').textContent = DOWNLOAD_HINTS.done;
 });
 

@@ -12,6 +12,7 @@ const FILES = [
   './recorder.js',
   './player.js',
   './sounds.js',
+  './zip.js',
   './recorder-worklet.js',
   './manifest.webmanifest',
 ];

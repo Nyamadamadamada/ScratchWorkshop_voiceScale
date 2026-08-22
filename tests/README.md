@@ -24,7 +24,7 @@ JavaScript のほうで、Python は見本音源づくりと検証に使う。
 ## 実ブラウザのテスト
 
 ```sh
-uv run python -m http.server -d docs 8765   # 別の端末で
+uv run python -m http.server -d app 8765   # 別の端末で
 npm install && npm test
 ```
 

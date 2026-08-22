@@ -1,5 +1,7 @@
-// 16bit PCM・モノラルの WAV を組み立てる。
+// 16bit PCM・モノラルの WAV を組み立てる。Scratch がそのまま読める形式。
+// src/voice_scale/wav.py と対になる。
 
+// バイト列を返す。Blob にするか ZIP に入れるかは呼び出し側が決める。
 export function encodeWav(samples, sr) {
   const buffer = new ArrayBuffer(44 + samples.length * 2);
   const view = new DataView(buffer);
@@ -26,5 +28,5 @@ export function encodeWav(samples, sr) {
     const v = Math.max(-1, Math.min(1, samples[i]));
     view.setInt16(44 + i * 2, v < 0 ? v * 0x8000 : v * 0x7fff, true);
   }
-  return new Blob([buffer], { type: 'audio/wav' });
+  return new Uint8Array(buffer);
 }

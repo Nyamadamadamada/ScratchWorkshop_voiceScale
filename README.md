@@ -7,12 +7,12 @@ https://nyamadamadamada.github.io/ScratchWorkshop_voiceScale/
 ブラウザだけで完結する静的サイト。サーバー処理はなく、録音した声は外に出ない。
 
 ```
-docs/               GitHub Pages で配信する一式
-src/voice_scale/    Python 版。見本音源づくりと検証に使う
-tests/              テストの読みかたは tests/README.md
+app/                GitHub Pages で配信する一式
+src/voice_scale/    Python 版。見本音源づくりとローカル検証に使う
+tests/              テスト
 ```
 
-`docs/` と `src/voice_scale/` は1対1で対応する。`pitch` `check` `audio` `scale` `wav`
+`app/` と `src/voice_scale/` は1対1で対応する。`pitch` `check` `audio` `scale` `wav`
 は同じ名前のファイルに同じ処理が入っていて、同じ値を返す。ずれていないことは
 `tests/test_parity.py` で確かめる。
 
@@ -23,7 +23,7 @@ tests/              テストの読みかたは tests/README.md
 
 ```sh
 uv sync
-uv run python -m http.server -d docs 8760
+uv run python -m http.server -d app 8760
 ```
 
 `http://localhost:8760/` を開く。`localhost` はセキュアコンテキスト扱いなのでマイクが使える。
@@ -48,7 +48,8 @@ uv run voice-scale build 素材/にゃー.mp3 -o 見本/   # 8音のWAVを書き
 
 ## デプロイ
 
-`main` に push すれば反映される。GitHub Pages の Source は `main` ブランチの `/docs`。
+`main` に push すると GitHub Actions が `app/` を配る。
+GitHub Pages の Source は「GitHub Actions」。ビルドはしない。
 
 ```sh
 BASE_URL=https://nyamadamadamada.github.io/ScratchWorkshop_voiceScale/ npm test

@@ -5,9 +5,9 @@
 // 検証したいのは自分たちのコードなので、これで足りる。
 //
 //   npm test            # サーバーを立ててから実行する
-//   python3 -m http.server -d docs 8760
+//   python3 -m http.server -d app 8760
 import { chromium } from 'playwright';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:8760/';
 const OUT = process.env.OUT_DIR ?? null;
@@ -47,6 +47,16 @@ function makeSource(spec) {
       return dest.stream;
     };
   };
+}
+
+// ZIP の末尾から目次の情報を読む。中身が8つそろっているかだけ見る。
+function zipEntries(path) {
+  const bytes = readFileSync(path);
+  const at = bytes.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+  if (at < 0) return null;
+  const count = bytes.readUInt16LE(at + 10);
+  const text = bytes.toString('utf8');
+  return { count, has: (name) => text.includes(name) };
 }
 
 const browser = await chromium.launch({
@@ -101,26 +111,29 @@ for (const [title, spec, expect] of CASES) {
       problems.push('元の声が鳴らない');
     }
 
-    // まとめてダウンロード
-    const files = [];
-    page.on('download', async (d) => {
-      const name = d.suggestedFilename();
-      files.push(name);
-      if (OUT) {
-        const dir = `${OUT}/${title.replace(/\s+/g, '_')}`;
-        mkdirSync(dir, { recursive: true });
-        await d.saveAs(`${dir}/${name}`);
-      } else {
-        await d.delete();
-      }
-    });
+    // 8つの音がまとまった ZIP を1つ受け取る
+    const waiting = page.waitForEvent('download', { timeout: 15000 }).catch(() => null);
     await page.click('#download-all');
-    const until = Date.now() + 15000;
-    while (files.length < 8 && Date.now() < until) await page.waitForTimeout(150);
+    const download = await waiting;
 
-    const want = ['ド', 'レ', 'ミ', 'ファ', 'ソ', 'ラ', 'シ', '高いド'].map((n) => `${n}.wav`);
-    if (files.length !== 8) problems.push(`ダウンロードが ${files.length} 個`);
-    else if (files.join() !== want.join()) problems.push(`名前か順番が違う: ${files.join(' ')}`);
+    if (!download) {
+      problems.push('ダウンロードが始まらない');
+    } else {
+      const name = download.suggestedFilename();
+      if (name !== '音階.zip') problems.push(`名前が違う: ${name}`);
+      const dir = `${OUT ?? '/tmp/vs_zip'}/${title.replace(/\s+/g, '_')}`;
+      mkdirSync(dir, { recursive: true });
+      await download.saveAs(`${dir}/${name}`);
+
+      const zip = zipEntries(`${dir}/${name}`);
+      const want = ['ド', 'レ', 'ミ', 'ファ', 'ソ', 'ラ', 'シ', '高いド'];
+      if (!zip) problems.push('ZIP として読めない');
+      else if (zip.count !== 8) problems.push(`ZIP の中身が ${zip.count} 個`);
+      else {
+        const missing = want.filter((n) => !zip.has(`${n}.wav`));
+        if (missing.length) problems.push(`ZIP に入っていない: ${missing.join(' ')}`);
+      }
+    }
   }
 
   if (errors.length) problems.push(`コンソールエラー: ${errors.join(' / ')}`);

@@ -1,6 +1,6 @@
 """YIN法による基本周波数の検出。
 
-docs/pitch.js と対になる。同じ値を返すことは tests/test_parity.py で確認する。
+app/pitch.js と対になる。同じ値を返すことは tests/test_parity.py で確認する。
 """
 
 from __future__ import annotations
