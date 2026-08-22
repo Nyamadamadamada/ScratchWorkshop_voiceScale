@@ -1,15 +1,15 @@
 """声から音階をつくる。
 
-app/ に置いた JavaScript 版と1対1で対応する。同じ名前のファイルに
+docs/ に置いた JavaScript 版と1対1で対応する。同じ名前のファイルに
 同じ処理が入っていて、同じ値を返す。ずれていないことは
 tests/test_parity.py で確かめる。
 
-    pitch  声の高さを測る        app/pitch.js
-    check  音階にできるか判定する  app/check.js
-    audio  長さと音量をそろえる    app/audio.js
-    scale  8音をつくる           app/scale.js
-    wav    WAV を読み書きする     app/wav.js
-    cli    入り口                app/app.js
+    pitch  声の高さを測る        docs/pitch.js
+    check  音階にできるか判定する  docs/check.js
+    audio  長さと音量をそろえる    docs/audio.js
+    scale  8音をつくる           docs/scale.js
+    wav    WAV を読み書きする     docs/wav.js
+    cli    入り口                docs/app.js
 
 Python 版は見本音源づくりと検証に使う。当日子どもが触るのは JavaScript 版。
 """

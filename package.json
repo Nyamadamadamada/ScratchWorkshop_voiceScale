@@ -1,7 +1,7 @@
 {
   "name": "voice-scale-e2e",
   "private": true,
-  "description": "実ブラウザでの動作確認だけに使う。app/ の配信物は外部依存なしで動く。",
+  "description": "実ブラウザでの動作確認だけに使う。docs/ の配信物は外部依存なしで動く。",
   "scripts": {
     "test": "node tests/e2e/run.mjs"
   },

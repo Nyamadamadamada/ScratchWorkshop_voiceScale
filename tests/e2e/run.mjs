@@ -5,7 +5,7 @@
 // 検証したいのは自分たちのコードなので、これで足りる。
 //
 //   npm test            # サーバーを立ててから実行する
-//   python3 -m http.server -d app 8760
+//   python3 -m http.server -d docs 8760
 import { chromium } from 'playwright';
 import { mkdirSync, readFileSync } from 'node:fs';
 

@@ -1,6 +1,6 @@
 """録音した1音から、ドレミファソラシドの8音をつくる。
 
-app/scale.js と対になる。
+docs/scale.js と対になる。
 """
 
 from __future__ import annotations

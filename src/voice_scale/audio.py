@@ -1,6 +1,6 @@
 """波形の長さ・音量をそろえる処理。
 
-app/audio.js と対になる。どちらも同じ結果を返す。
+docs/audio.js と対になる。どちらも同じ結果を返す。
 """
 
 from __future__ import annotations

@@ -1,10 +1,10 @@
-// app/ の JavaScript に、Python 版と同じ入力を通して結果を返す。
+// docs/ の JavaScript に、Python 版と同じ入力を通して結果を返す。
 // tests/test_parity.py から呼ばれる。
 import { readFileSync } from 'node:fs';
-import { fitLength, normalize, trim } from '../../app/audio.js';
-import { judge } from '../../app/check.js';
-import { detect } from '../../app/pitch.js';
-import { baseFrequency, nearestNote } from '../../app/scale.js';
+import { fitLength, normalize, trim } from '../../docs/audio.js';
+import { judge } from '../../docs/check.js';
+import { detect } from '../../docs/pitch.js';
+import { baseFrequency, nearestNote } from '../../docs/scale.js';
 
 // 長さと音量をそろえたあと、鳴り終わりの振幅がどうなるか。
 // フェードが抜けているとここに差が出る。
